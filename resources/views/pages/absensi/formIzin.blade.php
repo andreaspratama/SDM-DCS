@@ -44,7 +44,7 @@
             </div>
         @endif
 
-        <form action="{{ route('formIzinStore') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+        <form action="{{ url('/formIzinStore', ['token' => $token]) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
             @csrf
 
             {{-- Employee --}}

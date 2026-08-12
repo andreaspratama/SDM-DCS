@@ -84,17 +84,6 @@
               </li>
             </ul>
             <!--end::Sidebar Menu-->
-
-            <!-- Docs CTA (bottom of sidebar) -->
-            <div class="p-3 mt-3 border-top border-secondary border-opacity-25">
-              <a
-                href="./docs/introduction.html"
-                class="btn btn-sm btn-outline-light w-100 d-flex align-items-center justify-content-center gap-2"
-              >
-                <i class="bi bi-book" aria-hidden="true"></i>
-                View documentation
-              </a>
-            </div>
           </nav>
         </div>
         <!--end::Sidebar Wrapper-->

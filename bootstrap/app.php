@@ -15,7 +15,24 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
-        );
-    })->create();
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+
+            if ($e->getStatusCode() === 403) {
+
+                return response()->view('pages.absensi.403', [
+                    'exception' => $e
+                ], 403);
+
+            } else {
+
+                return response()->view('pages.absensi.404', [
+                    'exception' => $e
+                ], 404);
+
+            }
+
+        });
+
+    })
+    ->create();

@@ -88,7 +88,7 @@
                   class="user-image rounded-circle shadow"
                   alt="Alexander Pierce"
                 />
-                <span class="d-none d-md-inline">Alexander Pierce</span>
+                <span class="d-none d-md-inline">{{Auth::user()->name}}</span>
               </a>
               <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end">
                 <!--begin::User Image-->
@@ -99,7 +99,7 @@
                     alt="Alexander Pierce"
                   />
                   <p>
-                    Alexander Pierce - Web Developer
+                    {{Auth::user()->name}}
                   </p>
                 </li>
                 <!--end::User Image-->
@@ -107,7 +107,14 @@
                 <!--end::Menu Body-->
                 <!--begin::Menu Footer-->
                 <li class="user-footer">
-                  <a href="#" class="btn btn-outline-danger float-end">Sign out</a>
+                    <form action="{{ route('logout') }}" method="POST">
+                        @csrf
+
+                        <button type="submit"
+                            class="btn btn-outline-danger float-end">
+                            🚪 Logout
+                        </button>
+                    </form>
                 </li>
                 <!--end::Menu Footer-->
               </ul>

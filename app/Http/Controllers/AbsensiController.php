@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\Unit;
+use App\Models\UnitFormToken;
 use App\Models\AttendanceLog;
 use App\Models\AttendanceActivity;
 use App\Models\AttendancePermission;
@@ -881,23 +882,97 @@ class AbsensiController extends Controller
         return view('pages.absensi.formIzin', compact('employees'));
     }
 
-    public function formIzinStore(Request $request)
+    public function formIzinStore(Request $request, string $token)
     {
+        // ===============================
+        // 🔐 VALIDASI TOKEN UNIT
+        // ===============================
+
+        $tokenHash = hash('sha256', $token);
+
+        $formToken = UnitFormToken::where('token_hash', $tokenHash)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$formToken) {
+            abort(404);
+        }
+
         $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'date_start'  => 'required|date',
-            'date_end'    => 'required|date|after_or_equal:date_start',
-            'time_start'  => 'nullable|date_format:H:i',
-            'time_end'    => 'nullable|date_format:H:i|after:time_start',
-            'type'        => 'required|in:Izin Keluar,Izin Terlambat,Keperluan Pribadi, Cuti, Sakit',
-            'description' => 'nullable|string|max:255',
-            'attachment'  => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048'
+            'employee_id' => [
+                'required',
+                'exists:employees,id',
+            ],
+
+            'date_start' => [
+                'required',
+                'date',
+            ],
+
+            'date_end' => [
+                'required',
+                'date',
+                'after_or_equal:date_start',
+            ],
+
+            'time_start' => [
+                'nullable',
+                'date_format:H:i',
+                'required_with:time_end',
+            ],
+
+            'time_end' => [
+                'nullable',
+                'date_format:H:i',
+                'after:time_start',
+            ],
+
+            'type' => [
+                'required',
+                'in:Izin Keluar,Izin Terlambat,Keperluan Pribadi,Cuti,Sakit',
+            ],
+
+            'description' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'attachment' => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:2048',
+            ],
         ]);
+
+        $employee = Employee::where('id', $request->employee_id)
+            ->where('unit_id', $formToken->unit_id)
+            ->first();
+
+        if (!$employee) {
+            abort(403, 'Karyawan tidak sesuai dengan unit form.');
+        }
+
+        // ===============================
+        // 📎 UPLOAD FILE
+        // ===============================
 
         $filePath = null;
 
         if ($request->hasFile('attachment')) {
-            $filePath = $request->file('attachment')->store('izin_files', 'public');
+
+            $file = $request->file('attachment');
+
+            if (!$file->isValid()) {
+                return back()
+                    ->withErrors([
+                        'attachment' => 'File gagal diupload. Silakan coba lagi.'
+                    ])
+                    ->withInput();
+            }
+
+            $filePath = $file->store('izin_files', 'public');
         }
 
         AttendancePermission::create([
