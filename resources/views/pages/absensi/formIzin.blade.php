@@ -77,13 +77,13 @@
             {{-- TIME --}}
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="text-sm text-gray-600">Jam Keluar</label>
+                    <label class="text-sm text-gray-600">Jam Awal</label>
                     <input type="time" name="time_start"
                         class="w-full mt-2 p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400">
                 </div>
 
                 <div>
-                    <label class="text-sm text-gray-600">Jam Kembali</label>
+                    <label class="text-sm text-gray-600">Jam Akhir</label>
                     <input type="time" name="time_end"
                         class="w-full mt-2 p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400">
                 </div>
@@ -94,11 +94,11 @@
                 <label class="text-sm text-gray-600">Jenis Izin</label>
                 <select name="type"
                     class="w-full mt-2 p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400">
-                    <option value="Izin Keluar">Izin Keluar</option>
-                    <option value="Izin Terlambat">Izin Terlambat</option>
-                    <option value="Keperluan Pribadi">Keperluan Pribadi</option>
-                    <option value="Cuti">Cuti</option>
-                    <option value="Sakit">Sakit</option>
+                    <option value="Pernikahan Pegawai">Pernikahan Pegawai</option>
+                    <option value="Pernikahan Anak Pegawai">Pernikahan Anak Pegawai</option>
+                    <option value="Istri Pegawai Melahirkan / Gugur Kandungan">Istri Pegawai Melahirkan / Gugur Kandungan</option>
+                    <option value="Suami/istri/anak/orangtua/mertua Pegawai masuk RS">Suami/istri/anak/orangtua/mertua Pegawai masuk RS</option>
+                    <option value="Suami/istri/anak/orangtua/mertua Pegawai meninggal dunia">Suami/istri/anak/orangtua/mertua Pegawai meninggal dunia</option>
                 </select>
             </div>
 

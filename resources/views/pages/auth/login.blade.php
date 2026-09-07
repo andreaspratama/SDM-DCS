@@ -97,7 +97,7 @@
             </div>
 
             <h1 class="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
-                SDM Absensi
+                SDM Rekap Absensi
             </h1>
 
             <p class="mt-2 text-sm text-slate-300">
@@ -394,7 +394,7 @@
         <div class="text-center mt-6">
 
             <p class="text-xs text-slate-500">
-                © {{ date('Y') }} SDM Absensi
+                © {{ date('Y') }} SDM Rekap Absensi
             </p>
 
             <p class="text-[10px] text-slate-600 mt-1">

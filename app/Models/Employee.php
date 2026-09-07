@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Employee extends Model
 {
@@ -21,5 +22,20 @@ class Employee extends Model
     public function workSchedule()
     {
         return $this->belongsTo(WorkSchedule::class);
+    }
+
+    public function employeeWorkSchedules(): HasMany
+    {
+        return $this->hasMany(EmployeeWorkSchedule::class);
+    }
+
+    public function division()
+    {
+        return $this->belongsTo(Division::class);
+    }
+
+    public function user()
+    {
+        return $this->hasOne(User::class);
     }
 }

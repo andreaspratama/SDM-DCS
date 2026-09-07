@@ -9,6 +9,21 @@ use Illuminate\Support\Str;
 
 class UnitFormTokenController extends Controller
 {
+    public function index()
+    {
+        $units = Unit::with('formToken')->orderBy('nama')->get();
+
+        $tokens = UnitFormToken::with('unit')
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('unit_id');
+
+        return view('pages.absensi.unit-form-token', compact(
+            'units',
+            'tokens'
+        ));
+    }
+
     public function generate(Unit $unit)
     {
         // Nonaktifkan token lama
@@ -23,14 +38,19 @@ class UnitFormTokenController extends Controller
         // Simpan hash token ke database
         UnitFormToken::create([
             'unit_id' => $unit->id,
+            'token' => $token,
             'token_hash' => hash('sha256', $token),
             'is_active' => true,
         ]);
 
-        // Untuk sementara kita tampilkan token asli
-        return response()->json([
-            'unit' => $unit->nama,
-            'token' => $token,
-        ]);
+        // URL asli untuk dibagikan ke unit
+        $link = url('/form-izin/' . $token);
+
+        return redirect()
+            ->route('unitFormToken.index')
+            ->with('generated_token', [
+                'unit' => $unit->nama,
+                'link' => $link,
+            ]);
     }
 }

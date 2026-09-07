@@ -9,8 +9,8 @@ class Unit extends Model
 {
     protected $guarded = [];
 
-    public function formTokens(): HasMany
+    public function formToken()
     {
-        return $this->hasMany(UnitFormToken::class);
+        return $this->hasOne(UnitFormToken::class);
     }
 }

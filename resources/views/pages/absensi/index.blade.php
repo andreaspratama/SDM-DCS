@@ -133,7 +133,9 @@
                                 <th>Total Hadir</th>
                                 <th>Tidak Masuk</th>
                                 <th>Telat</th>
+                                <th>Menit Telat</th>
                                 <th>Pulang Cepat</th>
+                                <th>Menit Pulang Cepat</th>
                                 <th>Tanpa Ket</th>
                                 <th>Keluar Tanpa Izin</th>
                                 <th>Total Jam</th>
@@ -224,22 +226,34 @@
                   }
               },
 
-              columns: [
-                  { data:'nama', name:'nama' },
-                  { data:'total_hadir', name:'total_hadir' },
-                  { data:'tidak_masuk', name:'tidak_masuk' },
-                  { data:'total_telat', name:'total_telat' },
-                  { data:'pulang_cepat', name:'pulang_cepat' },
-                  { data:'tanpa_keterangan', name:'tanpa_keterangan' },
-                  { data:'keluar_tanpa_izin', name:'keluar_tanpa_izin' },
-                  { data:'total_jam', name:'total_jam' },
-                  {
-                      data:'aksi',
-                      name:'aksi',
-                      orderable:false,
-                      searchable:false
-                  }
-              ]
+                columns: [
+                    { data:'nama', name:'nama' },
+
+                    { data:'total_hadir', name:'total_hadir' },
+
+                    { data:'tidak_masuk', name:'tidak_masuk' },
+
+                    { data:'total_telat', name:'total_telat' },
+
+                    { data:'total_menit_telat', name:'total_menit_telat' },
+
+                    { data:'pulang_cepat', name:'pulang_cepat' },
+
+                    { data:'total_menit_pulang_cepat', name:'total_menit_pulang_cepat' },
+
+                    { data:'tanpa_keterangan', name:'tanpa_keterangan' },
+
+                    { data:'keluar_tanpa_izin', name:'keluar_tanpa_izin' },
+
+                    { data:'total_jam', name:'total_jam' },
+
+                    {
+                        data:'aksi',
+                        name:'aksi',
+                        orderable:false,
+                        searchable:false
+                    }
+                ]
           });
 
 

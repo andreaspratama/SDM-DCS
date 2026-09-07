@@ -9,8 +9,9 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\AttendancePermission;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'role', 'unit_id', 'employee_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -28,5 +29,33 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'Admin';
+    }
+
+    public function isPimpinan(): bool
+    {
+        return $this->role === 'Pimpinan';
+    }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function permissionsToApprove()
+    {
+        return $this->hasMany(
+            AttendancePermission::class,
+            'approver_user_id'
+        );
     }
 }
