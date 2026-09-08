@@ -91,6 +91,8 @@ Route::prefix('admin')
         Route::delete('/work-calendar/{workCalendar}', [WorkCalendarController::class, 'destroy'])->name('workCalendar.destroy');
 
         // TEMPLATE JADWAL KERJA
+        Route::get('/work-schedules/create', [WorkScheduleController::class, 'create'])->name('workSchedule.create');
+        Route::post('/work-schedules', [WorkScheduleController::class, 'store'])->name('workSchedule.store');
         Route::get('/work-schedules', [WorkScheduleController::class, 'index'])->name('workSchedule.index');
         Route::get('/work-schedules/{workSchedule}/edit', [WorkScheduleController::class, 'edit'])->name('workSchedule.edit');
         Route::put('/work-schedules/{workSchedule}', [WorkScheduleController::class, 'update'])->name('workSchedule.update');

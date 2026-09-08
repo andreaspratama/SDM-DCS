@@ -143,13 +143,34 @@
 
     <div class="schedule-header">
 
-        <h2>
-            Template Jadwal Kerja
-        </h2>
+        <div class="d-flex
+            justify-content-between
+            align-items-center
+            mb-3">
 
-        <p>
-            Kelola jam kerja dasar yang digunakan sebagai default pegawai.
-        </p>
+            <div>
+
+                <h1 class="mb-1 fs-3">
+                    Template Jadwal Kerja
+                </h1>
+
+                <div class="text-muted">
+                    Kelola jam kerja dasar yang
+                    digunakan sebagai default pegawai.
+                </div>
+
+            </div>
+
+
+            <a
+                href="{{ route('workSchedule.create') }}"
+                class="btn btn-primary"
+            >
+                <i class="fa-solid fa-plus me-1"></i>
+                Tambah Template
+            </a>
+
+        </div>
 
     </div>
 

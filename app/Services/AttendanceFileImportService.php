@@ -14,6 +14,8 @@ class AttendanceFileImportService
     protected int $unitId;
 
     protected array $employees = [];
+
+    protected array $employeesExact = [];
     
     protected array $employeesNormalized = [];
 
@@ -30,12 +32,17 @@ class AttendanceFileImportService
     private function resetState(): void
     {
         $this->employees = [];
-        $this->employeesNormalized = [];
+
+        $this->employeesExact = [];
+
         $this->missingUids = [];
 
         $this->insertedLogs = 0;
+
         $this->savedAttendances = 0;
+
         $this->duplicates = 0;
+
         $this->skipped = 0;
     }
 
@@ -580,47 +587,60 @@ class AttendanceFileImportService
                 'work_schedule_id',
             ]);
 
+
         foreach ($employees as $employee) {
 
-            // ==========================================
-            // EXACT UID
-            // contoh:
-            // "01" tetap "01"
-            // "1"  tetap "1"
-            // ==========================================
+            // =====================================================
+            // UID ASLI / EXACT
+            //
+            // Contoh SHS:
+            // 01 tetap 01
+            // 1  tetap 1
+            // =====================================================
             $exactUid = trim(
                 (string) $employee->uid
             );
 
-            if ($exactUid !== '') {
-                $this->employees[$exactUid] = $employee;
+
+            // Bersihkan hanya format Excel seperti "1.0".
+            // TIDAK menghilangkan leading zero.
+            $exactUid = preg_replace(
+                '/\.0+$/',
+                '',
+                $exactUid
+            );
+
+
+            if ($exactUid === '') {
+                continue;
             }
 
 
-            // ==========================================
-            // NORMALIZED UID
-            // khusus format yang memang membutuhkan,
-            // terutama UM
-            // ==========================================
-            $normalizedUid = $this->normalizeUid(
-                $employee->uid
-            );
+            // Cache EXACT:
+            //
+            // 01 => employee Admin
+            // 1  => employee Guru
+            $this->employeesExact[$exactUid] =
+                $employee;
+
+
+            // =====================================================
+            // UID NORMAL
+            //
+            // Dipakai untuk mesin seperti UM:
+            // 0003 => 3
+            // =====================================================
+            $normalizedUid =
+                $this->normalizeUid(
+                    $exactUid
+                );
+
 
             if ($normalizedUid !== '') {
 
-                // Jangan overwrite kalau ternyata
-                // ada "01" dan "1" dalam unit yang sama.
-                if (
-                    !isset(
-                        $this->employeesNormalized[
-                            $normalizedUid
-                        ]
-                    )
-                ) {
-                    $this->employeesNormalized[
-                        $normalizedUid
-                    ] = $employee;
-                }
+                $this->employees[
+                    $normalizedUid
+                ] = $employee;
             }
         }
     }
@@ -659,31 +679,52 @@ class AttendanceFileImportService
     | FIND EMPLOYEE
     |--------------------------------------------------------------------------
     */
-    private function employeeByExactUid($uid): ?Employee
-    {
+    private function employeeByExactUid(
+    $uid
+    ): ?Employee {
+
         $uid = trim(
             (string) ($uid ?? '')
         );
 
-        // Excel kadang menghasilkan "1.0"
+
+        // Excel kadang menghasilkan:
+        // 1.0
+        //
+        // Tetapi:
+        // 01 TETAP 01
         $uid = preg_replace(
             '/\.0+$/',
             '',
             $uid
         );
 
+
         if ($uid === '') {
             return null;
         }
 
-        if (!isset($this->employees[$uid])) {
 
-            $this->missingUids[$uid] = true;
+        // =====================================================
+        // CARI EXACT UID
+        //
+        // 01 ≠ 1
+        // 02 ≠ 2
+        // =====================================================
+        if (
+            !isset(
+                $this->employeesExact[$uid]
+            )
+        ) {
+
+            $this->missingUids[$uid] =
+                true;
 
             return null;
         }
 
-        return $this->employees[$uid];
+
+        return $this->employeesExact[$uid];
     }
 
     private function employeeByNormalizedUid($uid): ?Employee
@@ -708,9 +749,13 @@ class AttendanceFileImportService
         return $this->employeesNormalized[$uid];
     }
 
-    private function importSmaMatrix(string $path): void
-    {
-        $spreadsheet = IOFactory::load($path);
+    private function importSmaMatrix(
+    string $path
+    ): void {
+
+        $spreadsheet =
+            IOFactory::load($path);
+
 
         $rows = $spreadsheet
             ->getActiveSheet()
@@ -721,16 +766,23 @@ class AttendanceFileImportService
                 false
             );
 
+
         if (empty($rows)) {
+
             throw new \RuntimeException(
                 'File SMA kosong atau tidak dapat dibaca.'
             );
         }
 
+
         $headerIndex = null;
+
         $header = [];
+
         $year = null;
+
         $month = null;
+
 
         // =========================================================
         // CARI PERIODE + HEADER
@@ -741,7 +793,9 @@ class AttendanceFileImportService
                 (string) ($row[0] ?? '')
             );
 
+
             // Contoh:
+            //
             // Made Date:2026/08/01-2026/08/31
             if (
                 str_starts_with(
@@ -758,15 +812,21 @@ class AttendanceFileImportService
                     )
                 ) {
 
-                    $year = (int) $match[1];
-                    $month = (int) $match[2];
+                    $year =
+                        (int) $match[1];
 
-                    // File SMA yang kita dukung sekarang
-                    // harus satu bulan
+                    $month =
+                        (int) $match[2];
+
+
+                    // Periode harus
+                    // berada dalam bulan yang sama.
                     if (
-                        (int) $match[3] !== $year ||
+                        (int) $match[3] !== $year
+                        ||
                         (int) $match[4] !== $month
                     ) {
+
                         throw new \RuntimeException(
                             'Periode SMA harus berada dalam satu bulan.'
                         );
@@ -775,24 +835,32 @@ class AttendanceFileImportService
             }
 
 
+            // =====================================================
+            // HEADER
+            // =====================================================
             if (
-                $this->normalizeHeader($firstCell)
-                === 'employee id'
+                $this->normalizeHeader(
+                    $firstCell
+                ) === 'employee id'
             ) {
 
                 $headerIndex = $index;
+
                 $header = $row;
             }
         }
 
 
         if ($headerIndex === null) {
+
             throw new \RuntimeException(
                 'Header Employee ID pada file SMA tidak ditemukan.'
             );
         }
 
+
         if (!$year || !$month) {
+
             throw new \RuntimeException(
                 'Periode Made Date pada file SMA tidak ditemukan.'
             );
@@ -803,46 +871,69 @@ class AttendanceFileImportService
         // PROSES SETIAP EMPLOYEE
         // =========================================================
         foreach (
-            array_slice($rows, $headerIndex + 1)
+            array_slice(
+                $rows,
+                $headerIndex + 1
+            )
             as $row
         ) {
 
-            $uid = $this->normalizeUid(
-                $row[0] ?? null
+            // =====================================================
+            // UID SMA HARUS EXACT
+            //
+            // 01 ≠ 1
+            // 02 ≠ 2
+            // =====================================================
+            $uid = trim(
+                (string) ($row[0] ?? '')
             );
+
 
             if ($uid === '') {
                 continue;
             }
 
 
-            $employee = $this->employeeByExactUid(
-                $uid
-            );
+            $employee =
+                $this->employeeByExactUid(
+                    $uid
+                );
 
 
             // =====================================================
             // PROSES KOLOM TANGGAL 1 - 31
             // =====================================================
-            foreach ($header as $columnIndex => $dayRaw) {
+            foreach (
+                $header as
+                $columnIndex => $dayRaw
+            ) {
 
-                // kolom 0-2 = UID, nama, department
+                // Kolom:
+                // 0 = Employee ID
+                // 1 = Name
+                // 2 = Department
                 if ($columnIndex < 3) {
                     continue;
                 }
+
 
                 $dayRaw = trim(
                     (string) $dayRaw
                 );
 
+
                 if (
-                    $dayRaw === '' ||
+                    $dayRaw === ''
+                    ||
                     !ctype_digit($dayRaw)
                 ) {
                     continue;
                 }
 
-                $day = (int) $dayRaw;
+
+                $day =
+                    (int) $dayRaw;
+
 
                 if (
                     !checkdate(
@@ -856,8 +947,12 @@ class AttendanceFileImportService
 
 
                 $cell = trim(
-                    (string) ($row[$columnIndex] ?? '')
+                    (string) (
+                        $row[$columnIndex]
+                        ?? ''
+                    )
                 );
+
 
                 if ($cell === '') {
                     continue;
@@ -865,9 +960,10 @@ class AttendanceFileImportService
 
 
                 // =================================================
-                // AMBIL SEMUA JAM DARI CELL
+                // AMBIL SEMUA JAM
                 //
-                // contoh:
+                // Contoh cell:
+                //
                 // 06:58
                 // 12:06
                 // 12:07
@@ -879,35 +975,56 @@ class AttendanceFileImportService
                     $matches
                 );
 
-                $rawTimes = $matches[0] ?? [];
+
+                $rawTimes =
+                    $matches[0] ?? [];
+
 
                 if (empty($rawTimes)) {
+
                     $this->skipped++;
+
                     continue;
                 }
 
 
-                // exact duplicate:
-                // 06:47 06:47 16:23
+                // =================================================
+                // HAPUS EXACT DUPLICATE
+                //
+                // 06:47
+                // 06:47
+                // 16:23
+                //
                 // menjadi:
-                // 06:47 16:23
+                //
+                // 06:47
+                // 16:23
+                // =================================================
                 $times = array_values(
-                    array_unique($rawTimes)
+                    array_unique(
+                        $rawTimes
+                    )
                 );
 
 
                 $duplicateInCell =
-                    count($rawTimes) - count($times);
+                    count($rawTimes)
+                    -
+                    count($times);
+
 
                 if ($duplicateInCell > 0) {
-                    $this->duplicates += $duplicateInCell;
+
+                    $this->duplicates +=
+                        $duplicateInCell;
                 }
 
 
-                // Employee belum ada di master
+                // Employee tidak ditemukan
                 if (!$employee) {
 
-                    $this->skipped += count($times);
+                    $this->skipped +=
+                        count($times);
 
                     continue;
                 }
@@ -922,16 +1039,17 @@ class AttendanceFileImportService
 
 
                 // =================================================
-                // SIMPAN SEMUA SCAN
+                // SIMPAN SEMUA RAW SCAN
                 // =================================================
                 foreach ($times as $time) {
 
                     try {
 
-                        $scanTime = Carbon::createFromFormat(
-                            'Y-m-d H:i',
-                            $date . ' ' . $time
-                        );
+                        $scanTime =
+                            Carbon::createFromFormat(
+                                'Y-m-d H:i',
+                                $date . ' ' . $time
+                            );
 
                     } catch (\Throwable $e) {
 
@@ -941,24 +1059,27 @@ class AttendanceFileImportService
                     }
 
 
-                    $log = AttendanceLog::firstOrCreate(
-                        [
-                            'employee_id' =>
-                                $employee->id,
+                    $log =
+                        AttendanceLog::firstOrCreate(
+                            [
+                                'employee_id' =>
+                                    $employee->id,
 
-                            'scan_time' =>
-                                $scanTime->format(
-                                    'Y-m-d H:i:s'
-                                ),
-                        ],
-                        [
-                            'uid' =>
-                                $employee->uid,
-                        ]
-                    );
+                                'scan_time' =>
+                                    $scanTime->format(
+                                        'Y-m-d H:i:s'
+                                    ),
+                            ],
+                            [
+                                'uid' =>
+                                    $employee->uid,
+                            ]
+                        );
 
 
-                    if ($log->wasRecentlyCreated) {
+                    if (
+                        $log->wasRecentlyCreated
+                    ) {
 
                         $this->insertedLogs++;
 
