@@ -122,21 +122,110 @@
                                         {{-- JAM --}}
                                         <td>
 
+                                            {{-- ================================================
+                                                IZIN KELUAR SEMENTARA
+                                            ================================================= --}}
                                             @if(
-                                                $permission->time_start &&
-                                                $permission->time_end
+                                                in_array(
+                                                    $permission->type,
+                                                    [
+                                                        'Izin Keluar Sementara',
+                                                        'Keperluan Pribadi'
+                                                    ],
+                                                    true
+                                                )
                                             )
 
-                                                {{ $permission->time_start }}
-                                                <br>
-                                                s/d
-                                                <br>
-                                                {{ $permission->time_end }}
+                                                @if($permission->time_start && $permission->time_end)
 
+                                                    <span style="font-weight:600;">
+
+                                                        {{ substr($permission->time_start, 0, 5) }}
+
+                                                        <br>
+
+                                                        <span style="font-weight:400;">
+                                                            s/d
+                                                        </span>
+
+                                                        <br>
+
+                                                        {{ substr($permission->time_end, 0, 5) }}
+
+                                                    </span>
+
+                                                @else
+
+                                                    <span class="text-muted">
+                                                        -
+                                                    </span>
+
+                                                @endif
+
+
+                                            {{-- ================================================
+                                                IZIN TERLAMBAT
+                                            ================================================= --}}
+                                            @elseif($permission->type === 'Izin Terlambat')
+
+                                                @if($permission->time_start)
+
+                                                    <div style="color:#dc3545; font-weight:600;">
+
+                                                        <i class="fa-solid fa-clock me-1"></i>
+
+                                                        Datang:
+                                                        {{ substr($permission->time_start, 0, 5) }}
+
+                                                    </div>
+
+                                                @else
+
+                                                    <span class="text-muted">
+                                                        Jam belum diisi
+                                                    </span>
+
+                                                @endif
+
+
+                                            {{-- ================================================
+                                                IZIN PULANG AWAL
+                                            ================================================= --}}
+                                            @elseif($permission->type === 'Izin Pulang Awal')
+
+                                                @if($permission->time_start)
+
+                                                    <div style="color:#fd7e14; font-weight:600;">
+
+                                                        <i class="fa-solid fa-person-walking-arrow-right me-1"></i>
+
+                                                        Pulang:
+                                                        {{ substr($permission->time_start, 0, 5) }}
+
+                                                    </div>
+
+                                                @else
+
+                                                    <span class="text-muted">
+                                                        Jam belum diisi
+                                                    </span>
+
+                                                @endif
+
+
+                                            {{-- ================================================
+                                                IZIN FULL DAY
+                                            ================================================= --}}
                                             @else
 
-                                                <span class="text-muted">
+                                                <span style="
+                                                    color:#6c757d;
+                                                    font-weight:600;
+                                                ">
+
+                                                    <i class="fa-solid fa-calendar-day me-1"></i>
                                                     Full Day
+
                                                 </span>
 
                                             @endif

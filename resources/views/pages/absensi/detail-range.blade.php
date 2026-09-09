@@ -89,6 +89,31 @@
                         <b>{{ $summary['hari_kerja_khusus'] ?? 0 }}x</b>
                     </div>
 
+                    <div style="color:#0284c7;">
+                        <i class="fa-solid fa-people-group me-1"></i>
+
+                        Kegiatan Resmi:
+                        <b>{{ $summary['kegiatan_resmi'] ?? 0 }}x</b>
+                    </div>
+
+                    <div style="color:#6f42c1;">
+                        <i class="fa-solid fa-business-time me-1"></i>
+
+                        Lembur:
+                        <b>
+                            {{ $summary['hari_lembur'] ?? 0 }}x
+                        </b>
+                    </div>
+
+                    <div style="color:#6f42c1;">
+                        <i class="fa-solid fa-clock me-1"></i>
+
+                        Jam Lembur:
+                        <b>
+                            {{ $summary['total_jam_lembur_jam'] ?? 0 }} jam
+                        </b>
+                    </div>
+
                     <div style="color:#dc3545;">
                         🚨 Keluar Tanpa Izin: <b>{{ $summary['keluar_tanpa_izin'] }}x</b>
                     </div>
@@ -105,265 +130,641 @@
                     @foreach($data as $row)
 
                     @php
-                    $att = $row['absen'];
 
-                    $jamMasuk = optional($att)->check_in;
-                    $jamPulang = optional($att)->check_out;
+    // =====================================================
+    // DATA DASAR
+    // =====================================================
+    $att = $row['absen'] ?? null;
 
-                    $jamMasukStandar = optional($employee->workSchedule)->jam_masuk ?? '07:30:00';
-                    $jamPulangStandar = optional($employee->workSchedule)->jam_pulang ?? '15:30:00';
+    $jamMasuk =
+        optional($att)->check_in;
 
-                    $telat = $jamMasuk && $jamMasuk > $jamMasukStandar;
-                    $pulangCepat = $jamPulang && $jamPulang < $jamPulangStandar;
-
-                    // =====================================================
-                    // STATUS HARI
-                    // =====================================================
-                    if ($row['is_hari_kerja_khusus'] ?? false) {
-
-                        $status = 'HARI_KERJA_KHUSUS';
-
-                    } elseif ($row['izin'] && $row['izin']->count()) {
-
-                        $status = 'IZIN';
-
-                    } elseif ($att) {
-
-                        $status = 'HADIR';
-
-                    } else {
-
-                        $status = 'TANPA_KETERANGAN';
-                    }
-
-                    // 🎨 WARNA
-                    $color = match($status) {
-
-                        'HADIR' => [
-                            'border' => '#28a745',
-                            'bg' => '#eafaf1',
-                            'text' => 'green'
-                        ],
-
-                        'IZIN' => [
-                            'border' => '#0d6efd',
-                            'bg' => '#e7f1ff',
-                            'text' => 'blue'
-                        ],
-
-                        'HARI_KERJA_KHUSUS' => [
-                            'border' => '#0dcaf0',
-                            'bg' => '#e8f8fc',
-                            'text' => '#087990'
-                        ],
-
-                        'TANPA_KETERANGAN' => [
-                            'border' => '#ffc107',
-                            'bg' => '#fff8e1',
-                            'text' => '#856404'
-                        ],
-
-                        default => [
-                            'border' => '#dc3545',
-                            'bg' => '#fdecea',
-                            'text' => 'red'
-                        ]
-                    };
-
-                    // =====================================================
-                    // TIMELINE / DETAIL AKTIVITAS
-                    // =====================================================
-                    $timeline = [];
-
-                    // =====================================================
-                    // TERLAMBAT
-                    // =====================================================
-                    if ($status !== 'HARI_KERJA_KHUSUS' && $jamMasuk && $jamMasuk > $jamMasukStandar) {
-
-                        $standarMasukFix = \Carbon\Carbon::parse(
-                            $row['tanggal'] . ' ' . $jamMasukStandar
-                        );
-
-                        $masukFix = \Carbon\Carbon::parse(
-                            $row['tanggal'] . ' ' . $jamMasuk
-                        );
-
-                        $menitTelat = (int) $standarMasukFix
-                            ->diffInMinutes($masukFix);
-
-                        $timeline[] = [
-                            'text' => '⏰ Terlambat: ' . $menitTelat . ' menit',
-                            'color' => '#dc2626',
-                        ];
-                    }
+    $jamPulang =
+        optional($att)->check_out;
 
 
-                    // =====================================================
-                    // SEMUA IZIN
-                    // =====================================================
-                    if ($row['izin'] && $row['izin']->count()) {
+    // =====================================================
+    // STATUS DARI CONTROLLER
+    //
+    // Jangan hitung ulang status di Blade.
+    // Controller sudah menentukan:
+    //
+    // HADIR
+    // IZIN
+    // HARI_KERJA_KHUSUS
+    // KEGIATAN_RESMI
+    // LEMBUR
+    // ALPHA
+    // =====================================================
+    $status =
+        $row['status']
+        ?? 'ALPHA';
 
-                        foreach ($row['izin'] as $izin) {
 
-                            if ($izin->time_start && $izin->time_end) {
+    // =====================================================
+    // FLAG
+    // =====================================================
+    $isLembur =
+        (bool) (
+            $row['is_lembur']
+            ?? false
+        );
 
-                                $timeline[] = [
-                                    'text' => '📄 ' .
-                                        $izin->time_start .
-                                        ' - ' .
-                                        $izin->time_end .
-                                        ' → ' .
-                                        $izin->type,
+    $isKegiatanResmi =
+        (bool) (
+            $row['is_kegiatan_resmi']
+            ?? false
+        );
 
-                                    'color' => '#0d6efd',
-                                ];
-                            }
-                        }
-                    }
+    $isHariKerjaKhusus =
+        (bool) (
+            $row['is_hari_kerja_khusus']
+            ?? false
+        );
 
-                    // =====================================================
-                    // AKTIVITAS KELUAR → MASUK DI TENGAH JAM KERJA
-                    // =====================================================
-                    if ($status !== 'HARI_KERJA_KHUSUS' && $att && $att->activities) {
 
-                        $activities = $att->activities
-                            ->sortBy('time')
-                            ->values();
+    // =====================================================
+    // JADWAL
+    //
+    // PENTING:
+    // Lembur dan Kegiatan Resmi bisa jadwal = NULL.
+    //
+    // Karena itu JANGAN lagi pakai:
+    //
+    // $row['jadwal']['jam_masuk']
+    //
+    // secara langsung.
+    // =====================================================
+    $jamMasukStandar =
+        $row['jadwal']['jam_masuk']
+        ?? null;
 
-                        for ($i = 0; $i < $activities->count() - 1; $i++) {
+    $jamPulangStandar =
+        $row['jadwal']['jam_pulang']
+        ?? null;
 
-                            $current = $activities[$i];
-                            $next    = $activities[$i + 1];
 
-                            // Hanya pasangan OUT → IN
+    // =====================================================
+    // APAKAH HARI REGULER?
+    //
+    // Hanya hari reguler yang boleh dihitung:
+    //
+    // - terlambat
+    // - pulang cepat
+    // - keluar tanpa izin
+    // =====================================================
+    $isHariReguler =
+        !in_array(
+            $status,
+            [
+                'HARI_KERJA_KHUSUS',
+                'KEGIATAN_RESMI',
+                'LEMBUR'
+            ],
+            true
+        );
+
+
+    // =====================================================
+    // CARI IZIN TERLAMBAT
+    // =====================================================
+    $izinTerlambat = $row['izin']->first(
+        function ($permission) {
+
+            return
+                $permission->type === 'Izin Terlambat'
+                &&
+                $permission->time_start;
+        }
+    );
+
+
+    // =====================================================
+    // CARI IZIN PULANG AWAL
+    // =====================================================
+    $izinPulangAwal = $row['izin']->first(
+        function ($permission) {
+
+            return
+                $permission->type === 'Izin Pulang Awal'
+                &&
+                $permission->time_start;
+        }
+    );
+
+
+    // =====================================================
+    // TELAT
+    // =====================================================
+    $telat =
+        $isHariReguler
+        && $jamMasuk
+        && $jamMasukStandar
+        && $jamMasuk > $jamMasukStandar;
+
+
+    $telatDenganIzin = false;
+
+
+    if (
+        $telat
+        &&
+        $izinTerlambat
+    ) {
+
+        $jamMasukAktual =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamMasuk
+            );
+
+        $batasIzin =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $izinTerlambat->time_start
+            )
+            ->addMinutes(5);
+
+
+        if (
+            $jamMasukAktual->lte(
+                $batasIzin
+            )
+        ) {
+
+            $telatDenganIzin = true;
+            $telat = false;
+        }
+    }
+
+
+    // =====================================================
+    // PULANG CEPAT
+    // =====================================================
+    $pulangCepat =
+        $isHariReguler
+        && $jamPulang
+        && $jamPulangStandar
+        && $jamPulang < $jamPulangStandar;
+
+
+    $pulangAwalDenganIzin = false;
+
+
+    if (
+        $pulangCepat
+        &&
+        $izinPulangAwal
+    ) {
+
+        $jamPulangAktual =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamPulang
+            );
+
+
+        $batasIzin =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $izinPulangAwal->time_start
+            )
+            ->subMinutes(5);
+
+
+        if (
+            $jamPulangAktual->gte(
+                $batasIzin
+            )
+        ) {
+
+            $pulangAwalDenganIzin = true;
+            $pulangCepat = false;
+        }
+    }
+
+
+    // =====================================================
+    // WARNA CARD
+    // =====================================================
+    $color = match($status) {
+
+        'LEMBUR' => [
+            'border' => '#6f42c1',
+            'bg' => '#f3edff',
+            'text' => '#6f42c1'
+        ],
+
+        'KEGIATAN_RESMI' => [
+            'border' => '#0284c7',
+            'bg' => '#e0f2fe',
+            'text' => '#0369a1'
+        ],
+
+        'HADIR' => [
+            'border' => '#28a745',
+            'bg' => '#eafaf1',
+            'text' => 'green'
+        ],
+
+        'IZIN' => [
+            'border' => '#0d6efd',
+            'bg' => '#e7f1ff',
+            'text' => 'blue'
+        ],
+
+        'HARI_KERJA_KHUSUS' => [
+            'border' => '#0dcaf0',
+            'bg' => '#e8f8fc',
+            'text' => '#087990'
+        ],
+
+        'ALPHA',
+        'TANPA_KETERANGAN' => [
+            'border' => '#ffc107',
+            'bg' => '#fff8e1',
+            'text' => '#856404'
+        ],
+
+        default => [
+            'border' => '#dc3545',
+            'bg' => '#fdecea',
+            'text' => 'red'
+        ]
+    };
+
+
+    // =====================================================
+    // TIMELINE
+    // =====================================================
+    $timeline = [];
+
+    // =====================================================
+    // TERLAMBAT DENGAN IZIN
+    // =====================================================
+    if ($telatDenganIzin) {
+
+        $timeline[] = [
+
+            'text' =>
+                '✅ Terlambat Dengan Izin'
+                . ' (Datang: '
+                . $jamMasuk
+                . ')',
+
+            'color' =>
+                '#0d6efd',
+        ];
+    }
+
+
+    // =====================================================
+    // PULANG AWAL DENGAN IZIN
+    // =====================================================
+    if ($pulangAwalDenganIzin) {
+
+        $timeline[] = [
+
+            'text' =>
+                '✅ Pulang Awal Dengan Izin'
+                . ' (Pulang: '
+                . $jamPulang
+                . ')',
+
+            'color' =>
+                '#0d6efd',
+        ];
+    }
+
+    // =====================================================
+    // TERLAMBAT
+    // =====================================================
+    if ($telat) {
+
+        $standarMasukFix =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamMasukStandar
+            );
+
+        $masukFix =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamMasuk
+            );
+
+        $menitTelat =
+            (int) $standarMasukFix
+                ->diffInMinutes(
+                    $masukFix
+                );
+
+        $timeline[] = [
+            'text' =>
+                '⏰ Terlambat: '
+                . $menitTelat
+                . ' menit',
+
+            'color' =>
+                '#dc2626',
+        ];
+    }
+
+
+    // =====================================================
+    // IZIN
+    // =====================================================
+    if (
+        isset($row['izin'])
+        && $row['izin']
+        && $row['izin']->count()
+    ) {
+
+        foreach ($row['izin'] as $izinItem) {
+
+            if (
+                $izinItem->time_start
+                && $izinItem->time_end
+            ) {
+
+                $timeline[] = [
+
+                    'text' =>
+                        '📄 '
+                        . $izinItem->time_start
+                        . ' - '
+                        . $izinItem->time_end
+                        . ' → '
+                        . $izinItem->type,
+
+                    'color' =>
+                        '#0d6efd',
+                ];
+            }
+        }
+    }
+
+
+    // =====================================================
+    // AKTIVITAS KELUAR → MASUK
+    //
+    // HANYA HARI KERJA REGULER.
+    //
+    // Ini fix utama error:
+    //
+    // Trying to access array offset on null
+    //
+    // karena Kegiatan Resmi / Lembur tidak punya jadwal.
+    // =====================================================
+    if (
+        $isHariReguler
+        &&
+        $att
+        &&
+        $att->activities
+        &&
+        $jamMasukStandar
+        &&
+        $jamPulangStandar
+    ) {
+
+        $activities =
+            $att->activities
+                ->sortBy('time')
+                ->values();
+
+
+        // =============================================
+        // JAM STANDAR HARI INI
+        // =============================================
+        $standarMasuk =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamMasukStandar
+            );
+
+        $standarPulang =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamPulangStandar
+            );
+
+
+        // =============================================
+        // LOOP ACTIVITIES
+        // =============================================
+        for (
+            $i = 0;
+            $i < $activities->count() - 1;
+            $i++
+        ) {
+
+            $current =
+                $activities[$i];
+
+            $next =
+                $activities[$i + 1];
+
+
+            // =========================================
+            // HANYA OUT → IN
+            // =========================================
+            if (
+                $current->type !== 'out'
+                ||
+                $next->type !== 'in'
+            ) {
+                continue;
+            }
+
+
+            // =========================================
+            // JAM KELUAR / KEMBALI
+            // =========================================
+            $jamKeluar =
+                \Carbon\Carbon::parse(
+                    $row['tanggal']
+                    . ' '
+                    . $current->time
+                );
+
+            $jamKembali =
+                \Carbon\Carbon::parse(
+                    $row['tanggal']
+                    . ' '
+                    . $next->time
+                );
+
+
+            // =========================================
+            // HANYA DI DALAM JAM KERJA
+            // =========================================
+            if (
+                $jamKeluar->lt(
+                    $standarMasuk
+                )
+                ||
+                $jamKeluar->gte(
+                    $standarPulang
+                )
+            ) {
+                continue;
+            }
+
+
+            // =========================================
+            // DURASI KELUAR
+            // =========================================
+            $durasiKeluar =
+                (int) $jamKeluar
+                    ->diffInMinutes(
+                        $jamKembali
+                    );
+
+
+            // =========================================
+            // CEK IZIN
+            // =========================================
+            $izinAktivitas = null;
+
+            if (
+                isset($row['izin'])
+                &&
+                $row['izin']
+            ) {
+
+                $izinAktivitas =
+                    $row['izin']->first(
+                        function ($permission) use (
+                            $row,
+                            $jamKeluar,
+                            $jamKembali
+                        ) {
+
                             if (
-                                $current->type !== 'out' ||
-                                $next->type !== 'in'
+                                !$permission->time_start
+                                ||
+                                !$permission->time_end
                             ) {
-                                continue;
+                                return false;
                             }
 
-                            $jamKeluar = \Carbon\Carbon::parse(
-                                $row['tanggal'] . ' ' . $current->time
-                            );
 
-                            $jamKembali = \Carbon\Carbon::parse(
-                                $row['tanggal'] . ' ' . $next->time
-                            );
+                            $izinMulai =
+                                \Carbon\Carbon::parse(
+                                    $row['tanggal']
+                                    . ' '
+                                    . $permission->time_start
+                                );
 
-                            $standarMasuk = \Carbon\Carbon::parse(
-                                $row['tanggal'] . ' ' . $row['jadwal']['jam_masuk']
-                            );
+                            $izinSelesai =
+                                \Carbon\Carbon::parse(
+                                    $row['tanggal']
+                                    . ' '
+                                    . $permission->time_end
+                                );
 
-                            $standarPulang = \Carbon\Carbon::parse(
-                                $row['tanggal'] . ' ' . $row['jadwal']['jam_pulang']
-                            );
 
-                            // Hanya aktivitas di dalam jam kerja
-                            if (
-                                $jamKeluar->lt($standarMasuk) ||
-                                $jamKeluar->gte($standarPulang)
-                            ) {
-                                continue;
-                            }
-
-                            $durasiKeluar = (int) $jamKeluar
-                                ->diffInMinutes($jamKembali);
-
-                            // =================================================
-                            // CEK IZIN
-                            // =================================================
-                            $izinAktivitas = $row['izin']->first(
-                                function ($permission) use (
-                                    $row,
-                                    $jamKeluar,
+                            return
+                                $izinMulai->lte(
+                                    $jamKeluar
+                                )
+                                &&
+                                $izinSelesai->gte(
                                     $jamKembali
-                                ) {
-
-                                    if (
-                                        !$permission->time_start ||
-                                        !$permission->time_end
-                                    ) {
-                                        return false;
-                                    }
-
-                                    $izinMulai = \Carbon\Carbon::parse(
-                                        $row['tanggal'] . ' ' .
-                                        $permission->time_start
-                                    );
-
-                                    $izinSelesai = \Carbon\Carbon::parse(
-                                        $row['tanggal'] . ' ' .
-                                        $permission->time_end
-                                    );
-
-                                    return $izinMulai->lte($jamKeluar)
-                                        && $izinSelesai->gte($jamKembali);
-                                }
-                            );
-
-                            // =================================================
-                            // MASUKKAN KE TIMELINE
-                            // =================================================
-                            if ($izinAktivitas) {
-
-                                $timeline[] = [
-                                    'text' =>
-                                        '📄 Keluar Dengan Izin: ' .
-                                        $durasiKeluar .
-                                        ' menit (' .
-                                        $current->time .
-                                        ' - ' .
-                                        $next->time .
-                                        ')',
-
-                                    'color' => '#0d6efd',
-                                ];
-
-                            } else {
-
-                                $timeline[] = [
-                                    'text' =>
-                                        '🚨 Keluar Tanpa Izin: ' .
-                                        $durasiKeluar .
-                                        ' menit (' .
-                                        $current->time .
-                                        ' - ' .
-                                        $next->time .
-                                        ')',
-
-                                    'color' => '#dc2626',
-                                ];
-                            }
+                                );
                         }
-                    }
+                    );
+            }
 
 
-                    // =====================================================
-                    // PULANG CEPAT
-                    // =====================================================
-                    if ($status !== 'HARI_KERJA_KHUSUS' && $jamPulang && $jamPulang < $jamPulangStandar) {
+            // =========================================
+            // TIMELINE
+            // =========================================
+            if ($izinAktivitas) {
 
-                        $pulangFix = \Carbon\Carbon::parse(
-                            $row['tanggal'] . ' ' . $jamPulang
-                        );
+                $timeline[] = [
 
-                        $standarPulangFix = \Carbon\Carbon::parse(
-                            $row['tanggal'] . ' ' . $jamPulangStandar
-                        );
+                    'text' =>
+                        '📄 Keluar Dengan Izin: '
+                        . $durasiKeluar
+                        . ' menit ('
+                        . $current->time
+                        . ' - '
+                        . $next->time
+                        . ')',
 
-                        $menitPulangCepat = (int) $pulangFix
-                            ->diffInMinutes($standarPulangFix);
+                    'color' =>
+                        '#0d6efd',
+                ];
 
-                        $timeline[] = [
-                            'text' => '🏃 Pulang Cepat: ' .
-                                $menitPulangCepat .
-                                ' menit',
+            } else {
 
-                            'color' => '#c2410c',
-                        ];
-                    }
-                    @endphp
+                $timeline[] = [
+
+                    'text' =>
+                        '🚨 Keluar Tanpa Izin: '
+                        . $durasiKeluar
+                        . ' menit ('
+                        . $current->time
+                        . ' - '
+                        . $next->time
+                        . ')',
+
+                    'color' =>
+                        '#dc2626',
+                ];
+            }
+        }
+    }
+
+
+    // =====================================================
+    // PULANG CEPAT
+    // =====================================================
+    if ($pulangCepat) {
+
+        $pulangFix =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamPulang
+            );
+
+        $standarPulangFix =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamPulangStandar
+            );
+
+        $menitPulangCepat =
+            (int) $pulangFix
+                ->diffInMinutes(
+                    $standarPulangFix
+                );
+
+        $timeline[] = [
+
+            'text' =>
+                '🏃 Pulang Cepat: '
+                . $menitPulangCepat
+                . ' menit',
+
+            'color' =>
+                '#c2410c',
+        ];
+    }
+
+@endphp
 
                     <div style="
                         margin-bottom:20px;
@@ -381,7 +782,17 @@
 
                             <span style="font-weight:600; color:{{ $color['text'] }};">
 
-                                @if($status === 'HADIR')
+                                @if($status === 'KEGIATAN_RESMI')
+
+                                    <i class="fa-solid fa-people-group me-1"></i>
+                                    Kegiatan Resmi
+
+                                @elseif($status === 'LEMBUR')
+
+                                    <i class="fa-solid fa-business-time me-1"></i>
+                                    Lembur
+
+                                @elseif($status === 'HADIR')
 
                                     <i class="fa-solid fa-circle-check me-1"></i>
                                     Hadir
@@ -396,7 +807,10 @@
                                     <i class="fa-solid fa-calendar-check me-1"></i>
                                     Hari Kerja Khusus
 
-                                @elseif($status === 'TANPA_KETERANGAN')
+                                @elseif(
+                                    $status === 'ALPHA'
+                                    || $status === 'TANPA_KETERANGAN'
+                                )
 
                                     <i class="fa-solid fa-triangle-exclamation me-1"></i>
                                     Tanpa Keterangan
@@ -410,7 +824,229 @@
 
                         {{-- JAM --}}
                         <div style="font-size:14px;">
-                            @if($status === 'HARI_KERJA_KHUSUS')
+
+                            {{-- =====================================================
+                                KEGIATAN RESMI
+                            ====================================================== --}}
+                            @if($status === 'KEGIATAN_RESMI')
+
+                                <div style="
+                                    margin-top:14px;
+                                    padding:14px;
+                                    border-radius:10px;
+                                    background:#e0f2fe;
+                                    color:#0369a1;
+                                    border:1px solid #7dd3fc;
+                                ">
+
+                                    {{-- NAMA KEGIATAN --}}
+                                    <div style="
+                                        font-size:15px;
+                                        font-weight:700;
+                                        margin-bottom:5px;
+                                    ">
+
+                                        <i class="fa-solid fa-people-group me-1"></i>
+
+                                        {{
+                                            $row['official_activity_name']
+                                            ?? 'Kegiatan Resmi'
+                                        }}
+
+                                    </div>
+
+
+                                    {{-- NAMA KALDIK --}}
+                                    @if(!empty($row['calendar_name']))
+
+                                        <div style="
+                                            font-size:13px;
+                                            opacity:.8;
+                                            margin-bottom:12px;
+                                        ">
+
+                                            <i class="fa-solid fa-calendar-day me-1"></i>
+
+                                            {{ $row['calendar_name'] }}
+
+                                            @if(!empty($row['academic_year']))
+                                                · TA {{ $row['academic_year'] }}
+                                            @endif
+
+                                        </div>
+
+                                    @endif
+
+
+                                    {{-- JAM MASUK --}}
+                                    <div style="margin-bottom:5px;">
+
+                                        <i class="fa-solid fa-right-to-bracket me-1"></i>
+
+                                        Masuk:
+
+                                        <b>
+                                            {{ $jamMasuk ?? '-' }}
+                                        </b>
+
+                                    </div>
+
+
+                                    {{-- JAM PULANG --}}
+                                    <div style="margin-bottom:5px;">
+
+                                        <i class="fa-solid fa-right-from-bracket me-1"></i>
+
+                                        Pulang:
+
+                                        <b>
+                                            {{ $jamPulang ?? '-' }}
+                                        </b>
+
+                                    </div>
+
+
+                                    {{-- KETERANGAN --}}
+                                    <div style="
+                                        margin-top:12px;
+                                        padding:10px 12px;
+                                        border-radius:8px;
+                                        background:#bae6fd;
+                                        color:#075985;
+                                        font-size:13px;
+                                    ">
+
+                                        <i class="fa-solid fa-circle-info me-1"></i>
+
+                                        Kehadiran pada kegiatan resmi.
+                                        Tidak dihitung sebagai lembur,
+                                        terlambat, atau pulang cepat.
+
+                                    </div>
+
+                                </div>
+
+
+                            {{-- =====================================================
+                                LEMBUR
+                            ====================================================== --}}
+                            @elseif($status === 'LEMBUR')
+
+                                @php
+                                    $menitLembur =
+                                        (int) (
+                                            $row['menit_lembur']
+                                            ?? 0
+                                        );
+
+                                    $jamLembur =
+                                        intdiv(
+                                            $menitLembur,
+                                            60
+                                        );
+
+                                    $sisaMenitLembur =
+                                        $menitLembur % 60;
+                                @endphp
+
+
+                                <div style="
+                                    margin-top:14px;
+                                    padding:14px;
+                                    border-radius:10px;
+                                    background:#f3edff;
+                                    color:#5a32a3;
+                                    border:1px solid #d8c7ff;
+                                ">
+
+                                    <div style="
+                                        font-size:15px;
+                                        font-weight:700;
+                                        margin-bottom:10px;
+                                    ">
+
+                                        <i class="fa-solid fa-business-time me-1"></i>
+                                        Lembur di Hari Libur
+
+                                    </div>
+
+
+                                    <div style="margin-bottom:5px;">
+
+                                        <i class="fa-solid fa-right-to-bracket me-1"></i>
+
+                                        Masuk:
+                                        <b>{{ $jamMasuk ?? '-' }}</b>
+
+                                    </div>
+
+
+                                    <div style="margin-bottom:5px;">
+
+                                        <i class="fa-solid fa-right-from-bracket me-1"></i>
+
+                                        Pulang:
+                                        <b>{{ $jamPulang ?? '-' }}</b>
+
+                                    </div>
+
+
+                                    @if($jamMasuk && $jamPulang)
+
+                                        <div style="
+                                            margin-top:10px;
+                                            padding-top:8px;
+                                            border-top:1px dashed #bfa8ef;
+                                            font-weight:700;
+                                        ">
+
+                                            <i class="fa-solid fa-clock me-1"></i>
+
+                                            Durasi Lembur:
+
+                                            @if($jamLembur > 0)
+                                                {{ $jamLembur }} jam
+                                            @endif
+
+                                            @if($sisaMenitLembur > 0)
+                                                {{ $sisaMenitLembur }} menit
+                                            @endif
+
+                                            @if(
+                                                $jamLembur === 0
+                                                && $sisaMenitLembur === 0
+                                            )
+                                                0 menit
+                                            @endif
+
+                                        </div>
+
+                                    @else
+
+                                        <div style="
+                                            margin-top:10px;
+                                            padding:8px 10px;
+                                            border-radius:8px;
+                                            background:#fff3cd;
+                                            color:#856404;
+                                        ">
+
+                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+
+                                            Durasi lembur belum dapat dihitung karena
+                                            scan masuk atau pulang tidak lengkap.
+
+                                        </div>
+
+                                    @endif
+
+                                </div>
+
+
+                            {{-- =====================================================
+                                HARI KERJA KHUSUS
+                            ====================================================== --}}
+                            @elseif($status === 'HARI_KERJA_KHUSUS')
 
                                 <div style="
                                     margin-top:14px;
@@ -425,9 +1061,14 @@
                                         font-weight:700;
                                         margin-bottom:5px;
                                     ">
+
                                         <i class="fa-solid fa-calendar-day me-1"></i>
 
-                                        {{ $row['calendar_name'] ?? 'Hari Kerja Khusus' }}
+                                        {{
+                                            $row['calendar_name']
+                                            ?? 'Hari Kerja Khusus'
+                                        }}
+
                                     </div>
 
 
@@ -447,18 +1088,26 @@
                                             font-size:12px;
                                             opacity:.75;
                                         ">
-                                            Sesuai Kaldik TA {{ $row['academic_year'] }}
+
+                                            Sesuai Kaldik TA
+                                            {{ $row['academic_year'] }}
+
                                         </div>
 
                                     @endif
 
                                 </div>
 
+
+                            {{-- =====================================================
+                                HARI NORMAL / IZIN / ALPHA
+                            ====================================================== --}}
                             @else
 
                                 <div style="margin-top:12px;">
 
                                     <div>
+
                                         <i class="fa-solid fa-right-to-bracket me-1"></i>
 
                                         Masuk:
@@ -466,17 +1115,28 @@
 
                                         @if($jamMasuk)
 
-                                            @if($telat)
+                                            @if($telatDenganIzin)
+
+                                                <span style="color:#0d6efd; font-weight:600;">
+                                                    (Dengan Izin)
+                                                </span>
+
+                                            @elseif($telat)
+
                                                 <span style="color:red;">
                                                     (Terlambat)
                                                 </span>
+
                                             @else
+
                                                 <span style="color:green;">
                                                     (On Time)
                                                 </span>
+
                                             @endif
 
                                         @endif
+
                                     </div>
 
 
@@ -489,14 +1149,24 @@
 
                                         @if($jamPulang)
 
-                                            @if($pulangCepat)
+                                            @if($pulangAwalDenganIzin)
+
+                                                <span style="color:#0d6efd; font-weight:600;">
+                                                    (Dengan Izin)
+                                                </span>
+
+                                            @elseif($pulangCepat)
+
                                                 <span style="color:red;">
                                                     (Pulang Cepat)
                                                 </span>
+
                                             @else
+
                                                 <span style="color:green;">
                                                     (Sesuai)
                                                 </span>
+
                                             @endif
 
                                         @endif
@@ -506,6 +1176,7 @@
                                 </div>
 
                             @endif
+
                         </div>
 
                         {{-- 🔥 TIMELINE --}}
@@ -544,21 +1215,74 @@
                                         {{ $izin->description }}
                                     </span>
 
-                                    @if($izin->time_start && $izin->time_end)
-                                        <div style="font-size:12px; color:#666;">
-                                            ⏰ {{ $izin->time_start }} - {{ $izin->time_end }}
-                                        </div>
-                                    @else
-                                        <div style="
-                                            margin-top:5px;
-                                            padding:6px;
-                                            background:#fff3cd;
-                                            color:#856404;
-                                            border-radius:6px;
-                                            font-size:12px;
-                                        ">
-                                            ⚠️ Jam izin belum lengkap
-                                        </div>
+                                    {{-- =============================================
+                                        JAM IZIN
+                                    ============================================= --}}
+
+                                    @if(
+                                        in_array(
+                                            $izin->type,
+                                            [
+                                                'Izin Keluar Sementara',
+                                                'Keperluan Pribadi'
+                                            ],
+                                            true
+                                        )
+                                    )
+
+                                        @if($izin->time_start && $izin->time_end)
+
+                                            <div style="
+                                                font-size:12px;
+                                                color:#666;
+                                                margin-top:5px;
+                                            ">
+
+                                                🕒
+                                                {{ $izin->time_start }}
+                                                -
+                                                {{ $izin->time_end }}
+
+                                            </div>
+
+                                        @endif
+
+
+                                    @elseif($izin->type === 'Izin Terlambat')
+
+                                        @if($izin->time_start)
+
+                                            <div style="
+                                                font-size:12px;
+                                                color:#dc3545;
+                                                margin-top:5px;
+                                            ">
+
+                                                ⏰ Izin datang:
+                                                <b>{{ $izin->time_start }}</b>
+
+                                            </div>
+
+                                        @endif
+
+
+                                    @elseif($izin->type === 'Izin Pulang Awal')
+
+                                        @if($izin->time_start)
+
+                                            <div style="
+                                                font-size:12px;
+                                                color:#fd7e14;
+                                                margin-top:5px;
+                                            ">
+
+                                                🏃 Izin pulang:
+                                                <b>{{ $izin->time_start }}</b>
+
+                                            </div>
+
+                                        @endif
+
                                     @endif
                                     {{-- 🔥 LAMPIRAN TARUH DI SINI --}}
                                     @if($izin->attachment)

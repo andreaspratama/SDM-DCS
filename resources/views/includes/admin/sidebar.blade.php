@@ -91,9 +91,9 @@
                 <li class="nav-item">
 
                     <a
-                        href="{{ route('absensi.index') }}"
+                        href="{{ route('dashboard') }}"
                         class="nav-link {{
-                            request()->routeIs('absensi.index')
+                            request()->routeIs('dashboard')
                                 ? 'active'
                                 : ''
                         }}"
@@ -140,33 +140,54 @@
 
                     <ul class="nav nav-treeview">
 
+                        @php
+                            $loginEmployeeRole = null;
 
-                        {{-- REKAP ABSENSI --}}
-                        <li class="nav-item">
+                            if (
+                                auth()->check()
+                                && auth()->user()->employee_id
+                            ) {
+                                $loginEmployeeRole =
+                                    \App\Models\Employee::where(
+                                        'id',
+                                        auth()->user()->employee_id
+                                    )->value('role');
+                            }
+                        @endphp
 
-                            <a
-                                href="{{ route('absensi.index') }}"
-                                class="nav-link {{
-                                    request()->routeIs(
-                                        'absensi.index',
-                                        'absensi.datatable',
-                                        'absensi.detailRange',
-                                        'absensi.export'
-                                    )
-                                        ? 'active'
-                                        : ''
-                                }}"
-                            >
+                        {{-- =====================================================
+                            REKAP ABSENSI
+                            Kepala Bidang tidak ditampilkan
+                        ===================================================== --}}
+                        @if($loginEmployeeRole !== 'Kepala Bidang')
 
-                                <i class="nav-icon bi bi-table"></i>
+                            <li class="nav-item">
 
-                                <p>
-                                    Rekap Absensi
-                                </p>
+                                <a
+                                    href="{{ route('absensi.index') }}"
+                                    class="nav-link {{
+                                        request()->routeIs(
+                                            'absensi.index',
+                                            'absensi.datatable',
+                                            'absensi.detailRange',
+                                            'absensi.export'
+                                        )
+                                            ? 'active'
+                                            : ''
+                                    }}"
+                                >
 
-                            </a>
+                                    <i class="nav-icon bi bi-table"></i>
 
-                        </li>
+                                    <p>
+                                        Rekap Absensi
+                                    </p>
+
+                                </a>
+
+                            </li>
+
+                        @endif
 
 
                         {{-- UPLOAD ABSENSI --}}

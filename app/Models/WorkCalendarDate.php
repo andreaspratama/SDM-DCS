@@ -17,11 +17,14 @@ class WorkCalendarDate extends Model
         'type',
         'name',
         'description',
+        'has_official_activity',
+        'official_activity_name',
     ];
 
     protected $casts = [
         'date' => 'date',
         'is_workday' => 'boolean',
+        'has_official_activity' => 'boolean',
     ];
 
     public function unit()

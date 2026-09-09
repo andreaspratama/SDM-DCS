@@ -45,21 +45,75 @@
                   <div class="card mb-3 mt-3">
                       <div class="card-body">
                           <div class="row g-3 align-items-end">
-                                {{-- UNIT --}}
+                                {{-- =====================================================
+                                    UNIT
+                                ===================================================== --}}
                                 <div class="col-md-3">
-                                    <label for="unit_id" class="form-label fw-semibold">
-                                        🏢 Unit
+
+                                    <label class="form-label fw-semibold">
+                                        <i class="fa-solid fa-school me-1"></i>
+                                        Unit
                                     </label>
 
-                                    <select id="unit_id" class="form-select">
-                                        <option value="">Semua Unit</option>
 
-                                        @foreach(\App\Models\Unit::orderBy('nama')->get() as $unit)
-                                            <option value="{{ $unit->id }}">
-                                                {{ $unit->nama }}
+                                    {{-- =================================================
+                                        KEPALA SEKOLAH
+                                        Unit dikunci sesuai akun login
+                                    ================================================= --}}
+                                    @if($isKepsek)
+
+                                        {{-- Value ini tetap dibaca DataTable --}}
+                                        <input
+                                            type="hidden"
+                                            id="unit_id"
+                                            value="{{ $kepsekUnitId }}"
+                                        >
+
+                                        {{-- Hanya untuk tampilan --}}
+                                        <div
+                                            class="form-control bg-light d-flex align-items-center"
+                                            style="
+                                                min-height:38px;
+                                                cursor:not-allowed;
+                                                font-weight:600;
+                                            "
+                                        >
+                                            <i class="fa-solid fa-lock me-2 text-secondary"></i>
+
+                                            {{ $lockedUnit?->nama ?? 'Unit tidak ditemukan' }}
+                                        </div>
+
+                                        {{-- <div class="form-text">
+                                            Unit otomatis sesuai akun Kepala Sekolah.
+                                        </div> --}}
+
+
+                                    {{-- =================================================
+                                        ADMIN / DIREKTUR / USER LAIN
+                                    ================================================= --}}
+                                    @else
+
+                                        <select
+                                            id="unit_id"
+                                            class="form-select"
+                                        >
+
+                                            <option value="">
+                                                Semua Unit
                                             </option>
-                                        @endforeach
-                                    </select>
+
+                                            @foreach($units as $unit)
+
+                                                <option value="{{ $unit->id }}">
+                                                    {{ $unit->nama }}
+                                                </option>
+
+                                            @endforeach
+
+                                        </select>
+
+                                    @endif
+
                                 </div>
 
                               {{-- Tanggal Mulai --}}
@@ -173,6 +227,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
     <script>
       $(document).ready(function(){
+          const isKepsek = @json($isKepsek);
+          const kepsekUnitId = @json($kepsekUnitId);
 
           let today = new Date();
 
@@ -288,14 +344,24 @@
 
                 let today = new Date();
 
-                // ==========================
+                // =====================================================
                 // RESET UNIT
-                // ==========================
-                $('#unit_id').val('');
+                // =====================================================
+                if (isKepsek) {
 
-                // ==========================
+                    // Kepala Sekolah tetap terkunci ke unitnya
+                    $('#unit_id').val(kepsekUnitId);
+
+                } else {
+
+                    // Admin / Direktur kembali ke Semua Unit
+                    $('#unit_id').val('');
+                }
+
+
+                // =====================================================
                 // RESET TANGGAL
-                // ==========================
+                // =====================================================
                 let firstDay = new Date(
                     today.getFullYear(),
                     today.getMonth(),
@@ -308,12 +374,18 @@
                     0
                 );
 
-                $('#start_date').val(formatDateLocal(firstDay));
-                $('#end_date').val(formatDateLocal(lastDay));
+                $('#start_date').val(
+                    formatDateLocal(firstDay)
+                );
 
-                // ==========================
-                // RELOAD TABLE
-                // ==========================
+                $('#end_date').val(
+                    formatDateLocal(lastDay)
+                );
+
+
+                // =====================================================
+                // RELOAD
+                // =====================================================
                 table.ajax.reload();
             };
 
@@ -323,34 +395,60 @@
 
             window.exportExcel = function(){
 
-                let unit  = $('#unit_id').val();
+                let unit;
                 let start = $('#start_date').val();
                 let end   = $('#end_date').val();
 
-                // ==========================
+
+                // =====================================================
+                // UNIT
+                // =====================================================
+                if (isKepsek) {
+
+                    unit = kepsekUnitId;
+
+                } else {
+
+                    unit = $('#unit_id').val();
+                }
+
+
+                // =====================================================
                 // VALIDASI TANGGAL
-                // ==========================
+                // =====================================================
                 if (!start || !end) {
-                    alert('Tanggal mulai dan tanggal akhir harus diisi.');
+
+                    alert(
+                        'Tanggal mulai dan tanggal akhir harus diisi.'
+                    );
+
                     return;
                 }
+
 
                 if (start > end) {
-                    alert('Tanggal mulai tidak boleh lebih besar dari tanggal akhir.');
+
+                    alert(
+                        'Tanggal mulai tidak boleh lebih besar dari tanggal akhir.'
+                    );
+
                     return;
                 }
 
-                // ==========================
-                // BUAT URL EXPORT
-                // ==========================
-                let url = "{{ route('absensi.export') }}"
-                    + "?unit_id=" + encodeURIComponent(unit)
-                    + "&start_date=" + encodeURIComponent(start)
-                    + "&end_date=" + encodeURIComponent(end);
 
-                // ==========================
-                // DOWNLOAD EXCEL
-                // ==========================
+                // =====================================================
+                // URL EXPORT
+                // =====================================================
+                let url =
+                    "{{ route('absensi.export') }}"
+                    + "?unit_id="
+                    + encodeURIComponent(unit ?? '')
+                    + "&start_date="
+                    + encodeURIComponent(start)
+                    + "&end_date="
+                    + encodeURIComponent(end);
+
+
                 window.location.href = url;
             };
 

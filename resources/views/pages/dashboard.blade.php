@@ -1,494 +1,1217 @@
 @extends('layouts.admin')
 
 @section('title')
-    Dashboard
+    Dashboard | SDM Absensi
 @endsection
 
+
+@push('prepend-style')
+
+<style>
+
+    .dashboard-hero {
+        background:
+            linear-gradient(
+                135deg,
+                #0d6efd 0%,
+                #0dcaf0 100%
+            );
+
+        border-radius: 18px;
+        padding: 24px 28px;
+        color: white;
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .dashboard-hero::after {
+        content: '';
+        position: absolute;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.09);
+        right: -60px;
+        top: -90px;
+    }
+
+    .dashboard-hero h1 {
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .dashboard-hero p {
+        margin-bottom: 0;
+        opacity: .9;
+    }
+
+
+    /* =========================================
+       STAT CARD
+    ========================================= */
+
+    .stat-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow:
+            0 4px 18px rgba(0,0,0,.06);
+        height: 100%;
+        transition:
+            transform .2s ease,
+            box-shadow .2s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow:
+            0 8px 24px rgba(0,0,0,.09);
+    }
+
+    .stat-card .card-body {
+        padding: 20px;
+    }
+
+    .stat-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        font-size: 23px;
+    }
+
+    .stat-label {
+        font-size: 13px;
+        color: #6c757d;
+        margin-bottom: 3px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #212529;
+        line-height: 1.1;
+    }
+
+    .stat-note {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 6px;
+    }
+
+
+    /* =========================================
+       CONTENT CARD
+    ========================================= */
+
+    .dashboard-card {
+        border: 0;
+        border-radius: 16px;
+        box-shadow:
+            0 4px 18px rgba(0,0,0,.055);
+        overflow: hidden;
+    }
+
+    .dashboard-card .card-header {
+        background: white;
+        border-bottom: 1px solid #edf0f4;
+        padding: 18px 20px;
+    }
+
+    .dashboard-card .card-title {
+        font-weight: 700;
+        font-size: 16px;
+        margin: 0;
+    }
+
+
+    /* =========================================
+       UNIT PROGRESS
+    ========================================= */
+
+    .unit-progress {
+        height: 7px;
+        border-radius: 50px;
+        overflow: hidden;
+        background: #e9ecef;
+    }
+
+    .unit-progress .progress-bar {
+        border-radius: 50px;
+    }
+
+
+    /* =========================================
+       CALENDAR
+    ========================================= */
+
+    .calendar-item {
+        padding: 15px;
+        border-radius: 12px;
+        background: #f8f9fa;
+        margin-bottom: 10px;
+        border: 1px solid #edf0f4;
+    }
+
+
+    /* =========================================
+       PERMISSION
+    ========================================= */
+
+    .permission-row:last-child {
+        border-bottom: 0 !important;
+    }
+
+</style>
+
+@endpush
+
+
+
 @section('content')
-    <!--begin::App Main-->
-      <main class="app-main">
-        <!--begin::App Content Header-->
-        <div class="app-content-header">
-          <!--begin::Container-->
-          <div class="container-fluid">
-            <!--begin::Row-->
-            <div class="row">
-              <div class="col-sm-6">
-                <h1 class="mb-0 fs-3">Dashboard</h1>
-              </div>
-              <div class="col-sm-6">
-                <nav aria-label="breadcrumb">
-                  <ol class="breadcrumb float-sm-end">
-                    <li class="breadcrumb-item"><a href="#">Home</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
-                  </ol>
-                </nav>
-              </div>
+
+<main class="app-main">
+
+
+    {{-- =====================================================
+         HEADER
+    ===================================================== --}}
+    <div class="app-content-header">
+
+        <div class="container-fluid">
+
+            <div class="row align-items-center">
+
+                <div class="col-sm-7">
+
+                    <h1 class="mb-0 fs-3 fw-bold">
+                        Dashboard
+                    </h1>
+
+                </div>
+
+                <div class="col-sm-5">
+
+                    <ol class="breadcrumb float-sm-end mb-0">
+
+                        <li class="breadcrumb-item">
+                            Home
+                        </li>
+
+                        <li class="breadcrumb-item active">
+                            Dashboard
+                        </li>
+
+                    </ol>
+
+                </div>
+
             </div>
-            <!--end::Row-->
-          </div>
-          <!--end::Container-->
+
         </div>
-        <!--end::App Content Header-->
-        <!--begin::App Content-->
-        <div class="app-content">
-          <!--begin::Container-->
-          <div class="container-fluid">
-            <!--begin::Row-->
-            <div class="row">
-              <!--begin::Col-->
-              <div class="col-lg-3 col-6">
-                <!--begin::Small Box Widget 1-->
-                <div class="small-box text-bg-primary">
-                  <div class="inner">
-                    <h3>150</h3>
 
-                    <p>New Orders</p>
-                  </div>
-                  <svg
-                    class="small-box-icon"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M2.25 2.25a.75.75 0 000 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 00-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 000-1.5H5.378A2.25 2.25 0 017.5 15h11.218a.75.75 0 00.674-.421 60.358 60.358 0 002.96-7.228.75.75 0 00-.525-.965A60.864 60.864 0 005.68 4.509l-.232-.867A1.875 1.875 0 003.636 2.25H2.25zM3.75 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM16.5 20.25a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z"
-                    ></path>
-                  </svg>
-                  <a
-                    href="#"
-                    class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover"
-                  >
-                    More info <i class="bi bi-link-45deg"></i>
-                  </a>
-                </div>
-                <!--end::Small Box Widget 1-->
-              </div>
-              <!--end::Col-->
-              <div class="col-lg-3 col-6">
-                <!--begin::Small Box Widget 2-->
-                <div class="small-box text-bg-success">
-                  <div class="inner">
-                    <h3>53<sup class="fs-5">%</sup></h3>
+    </div>
 
-                    <p>Bounce Rate</p>
-                  </div>
-                  <svg
-                    class="small-box-icon"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.75c1.035 0 1.875-.84 1.875-1.875V4.125c0-1.036-.84-1.875-1.875-1.875h-.75zM9.75 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 01-1.875-1.875V8.625zM3 13.125c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v6.75c0 1.035-.84 1.875-1.875 1.875h-.75A1.875 1.875 0 013 19.875v-6.75z"
-                    ></path>
-                  </svg>
-                  <a
-                    href="#"
-                    class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover"
-                  >
-                    More info <i class="bi bi-link-45deg"></i>
-                  </a>
-                </div>
-                <!--end::Small Box Widget 2-->
-              </div>
-              <!--end::Col-->
-              <div class="col-lg-3 col-6">
-                <!--begin::Small Box Widget 3-->
-                <div class="small-box text-bg-warning">
-                  <div class="inner">
-                    <h3>44</h3>
 
-                    <p>User Registrations</p>
-                  </div>
-                  <svg
-                    class="small-box-icon"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M6.25 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM3.25 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM19.75 7.5a.75.75 0 00-1.5 0v2.25H16a.75.75 0 000 1.5h2.25v2.25a.75.75 0 001.5 0v-2.25H22a.75.75 0 000-1.5h-2.25V7.5z"
-                    ></path>
-                  </svg>
-                  <a
-                    href="#"
-                    class="small-box-footer link-dark link-underline-opacity-0 link-underline-opacity-50-hover"
-                  >
-                    More info <i class="bi bi-link-45deg"></i>
-                  </a>
-                </div>
-                <!--end::Small Box Widget 3-->
-              </div>
-              <!--end::Col-->
-              <div class="col-lg-3 col-6">
-                <!--begin::Small Box Widget 4-->
-                <div class="small-box text-bg-danger">
-                  <div class="inner">
-                    <h3>65</h3>
 
-                    <p>Unique Visitors</p>
-                  </div>
-                  <svg
-                    class="small-box-icon"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      clip-rule="evenodd"
-                      fill-rule="evenodd"
-                      d="M2.25 13.5a8.25 8.25 0 018.25-8.25.75.75 0 01.75.75v6.75H18a.75.75 0 01.75.75 8.25 8.25 0 01-16.5 0z"
-                    ></path>
-                    <path
-                      clip-rule="evenodd"
-                      fill-rule="evenodd"
-                      d="M12.75 3a.75.75 0 01.75-.75 8.25 8.25 0 018.25 8.25.75.75 0 01-.75.75h-7.5a.75.75 0 01-.75-.75V3z"
-                    ></path>
-                  </svg>
-                  <a
-                    href="#"
-                    class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover"
-                  >
-                    More info <i class="bi bi-link-45deg"></i>
-                  </a>
+    <div class="app-content">
+
+        <div class="container-fluid">
+
+
+            {{-- =================================================
+                 HERO
+            ================================================= --}}
+            <div class="dashboard-hero">
+
+                <div class="row align-items-center">
+
+                    <div class="col-md-8">
+
+                        <div class="small opacity-75 mb-1">
+                            Selamat datang
+                        </div>
+
+                        <h1 class="fs-3">
+                            {{ auth()->user()->name }}
+                        </h1>
+
+                        <p>
+
+                            <i class="bi bi-building me-1"></i>
+
+                            Monitoring SDM & Absensi
+
+                            <span class="mx-1">•</span>
+
+                            {{ $scopeName }}
+
+                        </p>
+
+                    </div>
+
+
+                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+
+                        <div class="fs-5 fw-semibold">
+
+                            {{ \Carbon\Carbon::parse($today)
+                                ->locale('id')
+                                ->translatedFormat('l, d F Y') }}
+
+                        </div>
+
+                        @if($loginEmployee)
+
+                            <div class="small opacity-75">
+
+                                {{ $loginEmployee->role }}
+
+                                @if($loginEmployee->unit)
+
+                                    • {{ $loginEmployee->unit->nama }}
+
+                                @endif
+
+                            </div>
+
+                        @endif
+
+                    </div>
+
                 </div>
-                <!--end::Small Box Widget 4-->
-              </div>
-              <!--end::Col-->
+
             </div>
-            <!--end::Row-->
-            <!--begin::Row-->
-            <div class="row">
-              <!-- Start col -->
-              <div class="col-lg-7 connectedSortable">
-                <div class="card mb-4">
-                  <div class="card-header">
-                    <h3 class="card-title">Sales Value</h3>
-                  </div>
 
-                  <div class="card-body">
-                    <div id="revenue-chart"></div>
-                  </div>
+
+
+            {{-- =================================================
+                 SUMMARY CARDS
+            ================================================= --}}
+            <div class="row g-3 mb-4">
+
+
+                {{-- TOTAL PEGAWAI --}}
+                <div class="col-xl-3 col-md-6">
+
+                    <div class="card stat-card">
+
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between">
+
+                                <div>
+
+                                    <div class="stat-label">
+                                        Total Pegawai
+                                    </div>
+
+                                    <div class="stat-value">
+                                        {{ number_format($totalPegawai) }}
+                                    </div>
+
+                                    <div class="stat-note">
+                                        {{ $scopeName }}
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        stat-icon
+                                        bg-primary-subtle
+                                        text-primary
+                                    "
+                                >
+
+                                    <i class="bi bi-people-fill"></i>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
                 </div>
-                <!-- /.card -->
 
-                <!-- DIRECT CHAT -->
-                <div class="card direct-chat direct-chat-primary mb-4">
-                  <div class="card-header">
-                    <h3 class="card-title">Direct Chat</h3>
 
-                    <div class="card-tools">
-                      <span title="3 New Messages" class="badge text-bg-primary"> 3 </span>
-                      <button
-                        type="button"
-                        class="btn btn-tool"
-                        data-lte-toggle="card-collapse"
-                        aria-label="Collapse card"
-                      >
-                        <i data-lte-icon="expand" class="bi bi-plus-lg"></i>
-                        <i data-lte-icon="collapse" class="bi bi-dash-lg"></i>
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-tool"
-                        title="Contacts"
-                        data-lte-toggle="chat-pane"
-                      >
-                        <i class="bi bi-chat-text-fill"></i>
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-tool"
-                        data-lte-toggle="card-remove"
-                        aria-label="Remove card"
-                      >
-                        <i class="bi bi-x-lg"></i>
-                      </button>
+
+                {{-- FINGERPRINT HARI INI --}}
+                <div class="col-xl-3 col-md-6">
+
+                    <div class="card stat-card">
+
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between">
+
+                                <div>
+
+                                    <div class="stat-label">
+                                        Fingerprint Hari Ini
+                                    </div>
+
+                                    <div class="stat-value">
+                                        {{ number_format($fingerprintHariIni) }}
+                                    </div>
+
+                                    <div class="stat-note">
+
+                                        {{ $fingerprintPercentage }}%
+
+                                        dari total pegawai
+
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        stat-icon
+                                        bg-success-subtle
+                                        text-success
+                                    "
+                                >
+
+                                    <i class="bi bi-fingerprint"></i>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
                     </div>
-                  </div>
-                  <!-- /.card-header -->
-                  <div class="card-body">
-                    <!-- Conversations are loaded here -->
-                    <div
-                      class="direct-chat-messages"
-                      role="log"
-                      tabindex="0"
-                      aria-label="Chat messages"
-                    >
-                      <!-- Message. Default to the start -->
-                      <div class="direct-chat-msg">
-                        <div class="direct-chat-infos clearfix">
-                          <span class="direct-chat-name float-start"> Alexander Pierce </span>
-                          <span class="direct-chat-timestamp float-end"> 23 Jan 2:00 pm </span>
-                        </div>
-                        <!-- /.direct-chat-infos -->
-                        <img
-                          class="direct-chat-img"
-                          src="./assets/img/user1-128x128.jpg"
-                          alt="message user image"
-                        />
-                        <!-- /.direct-chat-img -->
-                        <div class="direct-chat-text">
-                          Is this template really for free? That's unbelievable!
-                        </div>
-                        <!-- /.direct-chat-text -->
-                      </div>
-                      <!-- /.direct-chat-msg -->
 
-                      <!-- Message to the end -->
-                      <div class="direct-chat-msg end">
-                        <div class="direct-chat-infos clearfix">
-                          <span class="direct-chat-name float-end"> Sarah Bullock </span>
-                          <span class="direct-chat-timestamp float-start"> 23 Jan 2:05 pm </span>
-                        </div>
-                        <!-- /.direct-chat-infos -->
-                        <img
-                          class="direct-chat-img"
-                          src="./assets/img/user3-128x128.jpg"
-                          alt="message user image"
-                        />
-                        <!-- /.direct-chat-img -->
-                        <div class="direct-chat-text">You better believe it!</div>
-                        <!-- /.direct-chat-text -->
-                      </div>
-                      <!-- /.direct-chat-msg -->
-
-                      <!-- Message. Default to the start -->
-                      <div class="direct-chat-msg">
-                        <div class="direct-chat-infos clearfix">
-                          <span class="direct-chat-name float-start"> Alexander Pierce </span>
-                          <span class="direct-chat-timestamp float-end"> 23 Jan 5:37 pm </span>
-                        </div>
-                        <!-- /.direct-chat-infos -->
-                        <img
-                          class="direct-chat-img"
-                          src="./assets/img/user1-128x128.jpg"
-                          alt="message user image"
-                        />
-                        <!-- /.direct-chat-img -->
-                        <div class="direct-chat-text">
-                          Working with AdminLTE on a great new app! Wanna join?
-                        </div>
-                        <!-- /.direct-chat-text -->
-                      </div>
-                      <!-- /.direct-chat-msg -->
-
-                      <!-- Message to the end -->
-                      <div class="direct-chat-msg end">
-                        <div class="direct-chat-infos clearfix">
-                          <span class="direct-chat-name float-end"> Sarah Bullock </span>
-                          <span class="direct-chat-timestamp float-start"> 23 Jan 6:10 pm </span>
-                        </div>
-                        <!-- /.direct-chat-infos -->
-                        <img
-                          class="direct-chat-img"
-                          src="./assets/img/user3-128x128.jpg"
-                          alt="message user image"
-                        />
-                        <!-- /.direct-chat-img -->
-                        <div class="direct-chat-text">I would love to.</div>
-                        <!-- /.direct-chat-text -->
-                      </div>
-                      <!-- /.direct-chat-msg -->
-                    </div>
-                    <!-- /.direct-chat-messages-->
-
-                    <!-- Contacts are loaded here -->
-                    <div class="direct-chat-contacts">
-                      <ul class="contacts-list">
-                        <li>
-                          <a href="#">
-                            <img
-                              class="contacts-list-img"
-                              src="./assets/img/user1-128x128.jpg"
-                              alt="User Avatar"
-                            />
-
-                            <div class="contacts-list-info">
-                              <span class="contacts-list-name">
-                                Count Dracula
-                                <small class="contacts-list-date float-end"> 2/28/2023 </small>
-                              </span>
-                              <span class="contacts-list-msg"> How have you been? I was... </span>
-                            </div>
-                            <!-- /.contacts-list-info -->
-                          </a>
-                        </li>
-                        <!-- End Contact Item -->
-                        <li>
-                          <a href="#">
-                            <img
-                              class="contacts-list-img"
-                              src="./assets/img/user7-128x128.jpg"
-                              alt="User Avatar"
-                            />
-
-                            <div class="contacts-list-info">
-                              <span class="contacts-list-name">
-                                Sarah Doe
-                                <small class="contacts-list-date float-end"> 2/23/2023 </small>
-                              </span>
-                              <span class="contacts-list-msg"> I will be waiting for... </span>
-                            </div>
-                            <!-- /.contacts-list-info -->
-                          </a>
-                        </li>
-                        <!-- End Contact Item -->
-                        <li>
-                          <a href="#">
-                            <img
-                              class="contacts-list-img"
-                              src="./assets/img/user3-128x128.jpg"
-                              alt="User Avatar"
-                            />
-
-                            <div class="contacts-list-info">
-                              <span class="contacts-list-name">
-                                Nadia Jolie
-                                <small class="contacts-list-date float-end"> 2/20/2023 </small>
-                              </span>
-                              <span class="contacts-list-msg"> I'll call you back at... </span>
-                            </div>
-                            <!-- /.contacts-list-info -->
-                          </a>
-                        </li>
-                        <!-- End Contact Item -->
-                        <li>
-                          <a href="#">
-                            <img
-                              class="contacts-list-img"
-                              src="./assets/img/user5-128x128.jpg"
-                              alt="User Avatar"
-                            />
-
-                            <div class="contacts-list-info">
-                              <span class="contacts-list-name">
-                                Nora S. Vans
-                                <small class="contacts-list-date float-end"> 2/10/2023 </small>
-                              </span>
-                              <span class="contacts-list-msg"> Where is your new... </span>
-                            </div>
-                            <!-- /.contacts-list-info -->
-                          </a>
-                        </li>
-                        <!-- End Contact Item -->
-                        <li>
-                          <a href="#">
-                            <img
-                              class="contacts-list-img"
-                              src="./assets/img/user6-128x128.jpg"
-                              alt="User Avatar"
-                            />
-
-                            <div class="contacts-list-info">
-                              <span class="contacts-list-name">
-                                John K.
-                                <small class="contacts-list-date float-end"> 1/27/2023 </small>
-                              </span>
-                              <span class="contacts-list-msg"> Can I take a look at... </span>
-                            </div>
-                            <!-- /.contacts-list-info -->
-                          </a>
-                        </li>
-                        <!-- End Contact Item -->
-                        <li>
-                          <a href="#">
-                            <img
-                              class="contacts-list-img"
-                              src="./assets/img/user8-128x128.jpg"
-                              alt="User Avatar"
-                            />
-
-                            <div class="contacts-list-info">
-                              <span class="contacts-list-name">
-                                Kenneth M.
-                                <small class="contacts-list-date float-end"> 1/4/2023 </small>
-                              </span>
-                              <span class="contacts-list-msg"> Never mind I found... </span>
-                            </div>
-                            <!-- /.contacts-list-info -->
-                          </a>
-                        </li>
-                        <!-- End Contact Item -->
-                      </ul>
-                      <!-- /.contacts-list -->
-                    </div>
-                    <!-- /.direct-chat-pane -->
-                  </div>
-                  <!-- /.card-body -->
-                  <div class="card-footer">
-                    <form action="#" method="post">
-                      <div class="input-group">
-                        <input
-                          type="text"
-                          name="message"
-                          placeholder="Type Message ..."
-                          class="form-control"
-                        />
-                        <span class="input-group-append">
-                          <button type="button" class="btn btn-primary">Send</button>
-                        </span>
-                      </div>
-                    </form>
-                  </div>
-                  <!-- /.card-footer-->
                 </div>
-                <!-- /.direct-chat -->
-              </div>
-              <!-- /.Start col -->
 
-              <!-- Start col -->
-              <div class="col-lg-5 connectedSortable">
-                <div class="card text-white bg-primary bg-gradient border-primary mb-4">
-                  <div class="card-header border-0">
-                    <h3 class="card-title">Sales Value</h3>
-                    <div class="card-tools">
-                      <button
-                        type="button"
-                        class="btn btn-primary btn-sm"
-                        data-lte-toggle="card-collapse"
-                        aria-label="Collapse card"
-                      >
-                        <i data-lte-icon="expand" class="bi bi-plus-lg"></i>
-                        <i data-lte-icon="collapse" class="bi bi-dash-lg"></i>
-                      </button>
+
+
+                {{-- IZIN --}}
+                <div class="col-xl-3 col-md-6">
+
+                    <div class="card stat-card">
+
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between">
+
+                                <div>
+
+                                    <div class="stat-label">
+                                        Izin Aktif Hari Ini
+                                    </div>
+
+                                    <div class="stat-value">
+                                        {{ number_format($izinHariIni) }}
+                                    </div>
+
+                                    <div class="stat-note">
+                                        Izin yang sudah disetujui
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        stat-icon
+                                        bg-info-subtle
+                                        text-info
+                                    "
+                                >
+
+                                    <i class="bi bi-file-earmark-check-fill"></i>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
                     </div>
-                  </div>
-                  <div class="card-body">
-                    <div id="world-map" style="height: 220px"></div>
-                  </div>
-                  <div class="card-footer border-0">
-                    <!--begin::Row-->
-                    <div class="row">
-                      <div class="col-4 text-center">
-                        <div id="sparkline-1" class="text-dark"></div>
-                        <div class="text-white">Visitors</div>
-                      </div>
-                      <div class="col-4 text-center">
-                        <div id="sparkline-2" class="text-dark"></div>
-                        <div class="text-white">Online</div>
-                      </div>
-                      <div class="col-4 text-center">
-                        <div id="sparkline-3" class="text-dark"></div>
-                        <div class="text-white">Sales</div>
-                      </div>
-                    </div>
-                    <!--end::Row-->
-                  </div>
+
                 </div>
-              </div>
-              <!-- /.Start col -->
+
+
+
+                {{-- PENDING APPROVAL --}}
+                <div class="col-xl-3 col-md-6">
+
+                    <div class="card stat-card">
+
+                        <div class="card-body">
+
+                            <div class="d-flex justify-content-between">
+
+                                <div>
+
+                                    <div class="stat-label">
+                                        Menunggu Approval
+                                    </div>
+
+                                    <div class="stat-value">
+                                        {{ number_format($pendingApproval) }}
+                                    </div>
+
+                                    <div class="stat-note">
+
+                                        @if(auth()->user()->isPimpinan())
+
+                                            Perlu perhatian Anda
+
+                                        @else
+
+                                            Total pengajuan pending
+
+                                        @endif
+
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        stat-icon
+                                        bg-warning-subtle
+                                        text-warning
+                                    "
+                                >
+
+                                    <i class="bi bi-hourglass-split"></i>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
             </div>
-            <!-- /.row (main row) -->
-          </div>
-          <!--end::Container-->
+
+
+
+            {{-- =================================================
+                 INFO TAMBAHAN
+            ================================================= --}}
+            <div class="row g-4 mb-4">
+
+
+                {{-- =================================================
+                     UNIT SUMMARY
+                ================================================= --}}
+                <div class="col-lg-7">
+
+                    <div class="card dashboard-card h-100">
+
+                        <div
+                            class="
+                                card-header
+                                d-flex
+                                justify-content-between
+                                align-items-center
+                            "
+                        >
+
+                            <div>
+
+                                <h3 class="card-title">
+                                    <i
+                                        class="
+                                            bi
+                                            bi-bar-chart-fill
+                                            text-primary
+                                            me-2
+                                        "
+                                    ></i>
+
+                                    Ringkasan Fingerprint per Unit
+                                </h3>
+
+                                <small class="text-muted">
+                                    Data fingerprint untuk hari ini
+                                </small>
+
+                            </div>
+
+
+                            @if(!$isKabid)
+
+                                <a
+                                    href="{{ route('absensi.index') }}"
+                                    class="btn btn-sm btn-outline-primary"
+                                >
+                                    Lihat Rekap
+                                </a>
+
+                            @endif
+
+                        </div>
+
+
+                        <div class="card-body p-0">
+
+                            <div class="table-responsive">
+
+                                <table
+                                    class="
+                                        table
+                                        align-middle
+                                        mb-0
+                                    "
+                                >
+
+                                    <thead class="table-light">
+
+                                        <tr>
+
+                                            <th class="ps-4">
+                                                Unit
+                                            </th>
+
+                                            <th class="text-center">
+                                                Pegawai
+                                            </th>
+
+                                            <th class="text-center">
+                                                Fingerprint
+                                            </th>
+
+                                            <th style="width:220px;">
+                                                Cakupan
+                                            </th>
+
+                                        </tr>
+
+                                    </thead>
+
+
+                                    <tbody>
+
+                                    @forelse($unitSummary as $unit)
+
+                                        @php
+
+                                            $percentage =
+                                                $unit->total_pegawai > 0
+                                                    ? round(
+                                                        (
+                                                            $unit->fingerprint_hari_ini
+                                                            /
+                                                            $unit->total_pegawai
+                                                        )
+                                                        * 100
+                                                    )
+                                                    : 0;
+
+                                        @endphp
+
+
+                                        <tr>
+
+                                            <td class="ps-4 fw-semibold">
+                                                {{ $unit->nama }}
+                                            </td>
+
+
+                                            <td class="text-center">
+
+                                                {{ $unit->total_pegawai }}
+
+                                            </td>
+
+
+                                            <td class="text-center">
+
+                                                <span
+                                                    class="
+                                                        badge
+                                                        text-bg-success
+                                                    "
+                                                >
+                                                    {{ $unit->fingerprint_hari_ini }}
+                                                </span>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                <div
+                                                    class="
+                                                        d-flex
+                                                        align-items-center
+                                                        gap-2
+                                                    "
+                                                >
+
+                                                    <div
+                                                        class="
+                                                            progress
+                                                            unit-progress
+                                                            flex-grow-1
+                                                        "
+                                                    >
+
+                                                        <div
+                                                            class="
+                                                                progress-bar
+                                                                bg-primary
+                                                            "
+                                                            style="
+                                                                width:
+                                                                {{ $percentage }}%;
+                                                            "
+                                                        ></div>
+
+                                                    </div>
+
+
+                                                    <small
+                                                        class="
+                                                            fw-semibold
+                                                            text-muted
+                                                        "
+                                                    >
+                                                        {{ $percentage }}%
+                                                    </small>
+
+                                                </div>
+
+                                            </td>
+
+                                        </tr>
+
+                                    @empty
+
+                                        <tr>
+
+                                            <td
+                                                colspan="4"
+                                                class="
+                                                    text-center
+                                                    text-muted
+                                                    py-4
+                                                "
+                                            >
+                                                Tidak ada data unit.
+                                            </td>
+
+                                        </tr>
+
+                                    @endforelse
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                {{-- =================================================
+                     RIGHT SIDE
+                ================================================= --}}
+                <div class="col-lg-5">
+
+
+                    {{-- KALDIK --}}
+                    <div class="card dashboard-card mb-4">
+
+                        <div class="card-header">
+
+                            <h3 class="card-title">
+
+                                <i
+                                    class="
+                                        bi
+                                        bi-calendar-event-fill
+                                        text-info
+                                        me-2
+                                    "
+                                ></i>
+
+                                Kalender Kerja Hari Ini
+
+                            </h3>
+
+                        </div>
+
+
+                        <div class="card-body">
+
+                            @forelse($calendarToday as $calendar)
+
+                                <div class="calendar-item">
+
+                                    <div
+                                        class="
+                                            d-flex
+                                            justify-content-between
+                                            align-items-start
+                                            gap-2
+                                        "
+                                    >
+
+                                        <div>
+
+                                            <div class="fw-bold">
+
+                                                {{ $calendar->name }}
+
+                                            </div>
+
+
+                                            <div
+                                                class="
+                                                    small
+                                                    text-muted
+                                                    mt-1
+                                                "
+                                            >
+
+                                                @if($calendar->unit_id)
+
+                                                    {{
+                                                        $unitNames[
+                                                            $calendar->unit_id
+                                                        ] ?? 'Unit'
+                                                    }}
+
+                                                @else
+
+                                                    Semua Unit
+
+                                                @endif
+
+                                            </div>
+
+
+                                            @if($calendar->description)
+
+                                                <div
+                                                    class="
+                                                        small
+                                                        mt-2
+                                                        text-secondary
+                                                    "
+                                                >
+                                                    {{ $calendar->description }}
+                                                </div>
+
+                                            @endif
+
+                                        </div>
+
+
+                                        @if($calendar->is_workday)
+
+                                            <span
+                                                class="
+                                                    badge
+                                                    text-bg-success
+                                                "
+                                            >
+                                                Hari Kerja
+                                            </span>
+
+                                        @else
+
+                                            <span
+                                                class="
+                                                    badge
+                                                    text-bg-danger
+                                                "
+                                            >
+                                                Libur
+                                            </span>
+
+                                        @endif
+
+                                    </div>
+
+                                </div>
+
+                            @empty
+
+                                <div
+                                    class="
+                                        text-center
+                                        py-4
+                                        text-muted
+                                    "
+                                >
+
+                                    <i
+                                        class="
+                                            bi
+                                            bi-calendar-check
+                                            fs-2
+                                            d-block
+                                            mb-2
+                                        "
+                                    ></i>
+
+                                    Tidak ada agenda khusus hari ini.
+
+                                    <div class="small mt-1">
+                                        Mengikuti jadwal kerja normal.
+                                    </div>
+
+                                </div>
+
+                            @endforelse
+
+                        </div>
+
+                    </div>
+
+
+
+                    {{-- BELUM PULANG --}}
+                    <div class="card dashboard-card">
+
+                        <div class="card-body">
+
+                            <div
+                                class="
+                                    d-flex
+                                    align-items-center
+                                    justify-content-between
+                                "
+                            >
+
+                                <div>
+
+                                    <div
+                                        class="
+                                            text-muted
+                                            small
+                                            mb-1
+                                        "
+                                    >
+                                        Scan Masuk Tanpa Scan Pulang
+                                    </div>
+
+                                    <div
+                                        class="
+                                            fs-3
+                                            fw-bold
+                                        "
+                                    >
+                                        {{ $belumPulang }}
+                                    </div>
+
+                                    <small class="text-muted">
+                                        Data fingerprint hari ini
+                                    </small>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        stat-icon
+                                        bg-danger-subtle
+                                        text-danger
+                                    "
+                                >
+
+                                    <i class="bi bi-box-arrow-right"></i>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+            </div>
+
+
+
+            {{-- =================================================
+                 PENGAJUAN IZIN TERBARU
+            ================================================= --}}
+            <div class="card dashboard-card mb-4">
+
+
+                <div
+                    class="
+                        card-header
+                        d-flex
+                        justify-content-between
+                        align-items-center
+                    "
+                >
+
+                    <div>
+
+                        <h3 class="card-title">
+
+                            <i
+                                class="
+                                    bi
+                                    bi-file-earmark-text-fill
+                                    text-warning
+                                    me-2
+                                "
+                            ></i>
+
+                            Pengajuan Izin Menunggu Approval
+
+                        </h3>
+
+                        <small class="text-muted">
+                            Pengajuan terbaru yang perlu diproses
+                        </small>
+
+                    </div>
+
+
+                    @if(
+                        auth()->user()->isAdmin()
+                        ||
+                        auth()->user()->isPimpinan()
+                    )
+
+                        <a
+                            href="{{
+                                route(
+                                    'attendancePermission.index'
+                                )
+                            }}"
+                            class="
+                                btn
+                                btn-sm
+                                btn-outline-primary
+                            "
+                        >
+
+                            Lihat Semua
+
+                        </a>
+
+                    @endif
+
+                </div>
+
+
+                <div class="card-body p-0">
+
+                    <div class="table-responsive">
+
+                        <table
+                            class="
+                                table
+                                table-hover
+                                align-middle
+                                mb-0
+                            "
+                        >
+
+                            <thead class="table-light">
+
+                                <tr>
+
+                                    <th class="ps-4">
+                                        Pegawai
+                                    </th>
+
+                                    <th>
+                                        Unit
+                                    </th>
+
+                                    <th>
+                                        Jenis Izin
+                                    </th>
+
+                                    <th>
+                                        Periode
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
+
+                            @forelse(
+                                $latestPermissions
+                                as $permission
+                            )
+
+                                <tr class="permission-row">
+
+                                    <td class="ps-4">
+
+                                        <div class="fw-semibold">
+
+                                            {{
+                                                $permission
+                                                    ->employee
+                                                    ?->nama
+                                                ?? '-'
+                                            }}
+
+                                        </div>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        {{
+                                            $permission
+                                                ->employee
+                                                ?->unit
+                                                ?->nama
+                                            ?? '-'
+                                        }}
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <span
+                                            class="
+                                                badge
+                                                bg-light
+                                                text-dark
+                                                border
+                                            "
+                                        >
+
+                                            {{ $permission->type }}
+
+                                        </span>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <div class="small">
+
+                                            {{
+                                                \Carbon\Carbon::parse(
+                                                    $permission->date_start
+                                                )->format('d/m/Y')
+                                            }}
+
+                                            @if(
+                                                $permission->date_end
+                                                !=
+                                                $permission->date_start
+                                            )
+
+                                                -
+
+                                                {{
+                                                    \Carbon\Carbon::parse(
+                                                        $permission->date_end
+                                                    )->format('d/m/Y')
+                                                }}
+
+                                            @endif
+
+                                        </div>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <span
+                                            class="
+                                                badge
+                                                text-bg-warning
+                                            "
+                                        >
+                                            Pending
+                                        </span>
+
+                                    </td>
+
+                                </tr>
+
+                            @empty
+
+                                <tr>
+
+                                    <td
+                                        colspan="5"
+                                        class="
+                                            text-center
+                                            py-5
+                                            text-muted
+                                        "
+                                    >
+
+                                        <i
+                                            class="
+                                                bi
+                                                bi-check-circle-fill
+                                                text-success
+                                                fs-3
+                                                d-block
+                                                mb-2
+                                            "
+                                        ></i>
+
+                                        Tidak ada pengajuan izin
+                                        yang menunggu approval.
+
+                                    </td>
+
+                                </tr>
+
+                            @endforelse
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
         </div>
-        <!--end::App Content-->
-      </main>
-      <!--end::App Main-->
+
+    </div>
+
+</main>
+
 @endsection
