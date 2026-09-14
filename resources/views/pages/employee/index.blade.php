@@ -187,6 +187,63 @@
 
         <div class="container-fluid">
 
+            {{-- FLASH MESSAGE --}}
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+
+                    {{ session('success') }}
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close"
+                    ></button>
+                </div>
+            @endif
+
+
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                    <i class="bi bi-exclamation-circle-fill me-2"></i>
+
+                    {{ session('error') }}
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close"
+                    ></button>
+                </div>
+            @endif
+
+
+            @if($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+
+                    <div class="fw-bold mb-1">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Data belum dapat diproses
+                    </div>
+
+                    @foreach($errors->all() as $error)
+                        <div>
+                            • {{ $error }}
+                        </div>
+                    @endforeach
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close"
+                    ></button>
+
+                </div>
+            @endif
+
 
             {{-- FILTER --}}
             <div class="filter-box">
@@ -392,6 +449,341 @@
     </div>
 
 </main>
+
+{{-- MODAL NONAKTIFKAN / PEGAWAI KELUAR --}}
+<div class="modal fade"
+     id="deactivateEmployeeModal"
+     tabindex="-1"
+     aria-labelledby="deactivateEmployeeModalLabel"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content border-0 shadow">
+
+            <form
+                id="deactivateEmployeeForm"
+                method="POST"
+                action=""
+            >
+                @csrf
+
+                <div class="modal-header">
+
+                    <h5
+                        class="modal-title fw-bold"
+                        id="deactivateEmployeeModalLabel"
+                    >
+                        <i class="bi bi-person-x me-2 text-danger"></i>
+                        Nonaktifkan Pegawai
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                    ></button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    <div class="alert alert-warning">
+
+                        Pegawai:
+
+                        <strong id="deactivateEmployeeName">
+                            -
+                        </strong>
+
+                        <div class="small mt-1">
+                            Data absensi dan riwayat pegawai tidak akan dihapus.
+                        </div>
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="tanggal_keluar"
+                            class="form-label fw-semibold"
+                        >
+                            Tanggal Terakhir Bekerja
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <input
+                            type="date"
+                            name="tanggal_keluar"
+                            id="tanggal_keluar"
+                            class="form-control"
+                            required
+                        >
+
+                        <div class="form-text">
+                            Pegawai masih dihitung aktif sampai tanggal ini.
+                        </div>
+
+                    </div>
+
+
+                    <div>
+
+                        <label
+                            for="keterangan_keluar"
+                            class="form-label fw-semibold"
+                        >
+                            Keterangan
+                        </label>
+
+                        <textarea
+                            name="keterangan"
+                            id="keterangan_keluar"
+                            class="form-control"
+                            rows="3"
+                            placeholder="Contoh: Resign, pensiun, pindah tempat kerja, kontrak selesai..."
+                        ></textarea>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-light border"
+                        data-bs-dismiss="modal"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-danger"
+                    >
+                        <i class="bi bi-person-x me-1"></i>
+                        Nonaktifkan Pegawai
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{{-- MODAL PINDAH UNIT --}}
+<div class="modal fade"
+     id="transferUnitModal"
+     tabindex="-1"
+     aria-labelledby="transferUnitModalLabel"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content border-0 shadow">
+
+            <form
+                id="transferUnitForm"
+                method="POST"
+                action=""
+            >
+                @csrf
+
+                <div class="modal-header">
+
+                    <h5
+                        class="modal-title fw-bold"
+                        id="transferUnitModalLabel"
+                    >
+                        <i class="bi bi-arrow-left-right me-2 text-success"></i>
+                        Pindah Unit Pegawai
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                    ></button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    <div class="alert alert-info">
+
+                        Pegawai:
+
+                        <strong id="transferEmployeeName">
+                            -
+                        </strong>
+
+                        <div class="small mt-1">
+                            Riwayat unit lama akan tetap disimpan.
+                        </div>
+
+                    </div>
+
+
+                    {{-- UNIT TUJUAN --}}
+                    <div class="mb-3">
+
+                        <label
+                            for="transfer_unit_id"
+                            class="form-label fw-semibold"
+                        >
+                            Unit Tujuan
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <select
+                            name="unit_id"
+                            id="transfer_unit_id"
+                            class="form-select"
+                            required
+                        >
+
+                            <option value="">
+                                Pilih Unit Tujuan
+                            </option>
+
+                            @foreach($units as $unit)
+
+                                <option value="{{ $unit->id }}">
+                                    {{ $unit->nama }}
+                                </option>
+
+                            @endforeach
+
+                        </select>
+
+                    </div>
+
+                    {{-- JADWAL BARU --}}
+                    <div class="mb-3">
+
+                        <label
+                            for="transfer_work_schedule_id"
+                            class="form-label fw-semibold"
+                        >
+                            Jadwal Baru
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <select
+                            name="work_schedule_id"
+                            id="transfer_work_schedule_id"
+                            class="form-select"
+                            required
+                        >
+
+                            <option value="">
+                                Pilih Jadwal Baru
+                            </option>
+
+                            @foreach($workSchedules as $schedule)
+
+                                <option value="{{ $schedule->id }}">
+                                    {{ $schedule->nama }}
+                                </option>
+
+                            @endforeach
+
+                        </select>
+
+                        <div class="form-text">
+                            Jadwal ini mulai berlaku pada tanggal pindah unit.
+                        </div>
+
+                    </div>
+
+
+                    {{-- TANGGAL PINDAH --}}
+                    <div class="mb-3">
+
+                        <label
+                            for="tanggal_pindah"
+                            class="form-label fw-semibold"
+                        >
+                            Mulai Pindah Unit
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <input
+                            type="date"
+                            name="tanggal_pindah"
+                            id="tanggal_pindah"
+                            class="form-control"
+                            required
+                        >
+
+                        <div class="form-text">
+                            Mulai tanggal ini pegawai dianggap berada di unit baru.
+                        </div>
+
+                    </div>
+
+
+                    {{-- KETERANGAN --}}
+                    <div>
+
+                        <label
+                            for="keterangan_pindah"
+                            class="form-label fw-semibold"
+                        >
+                            Keterangan
+                        </label>
+
+                        <textarea
+                            name="keterangan"
+                            id="keterangan_pindah"
+                            class="form-control"
+                            rows="3"
+                            placeholder="Contoh: Mutasi dari UM ke Elementary..."
+                        ></textarea>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-light border"
+                        data-bs-dismiss="modal"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-success"
+                    >
+                        <i class="bi bi-arrow-left-right me-1"></i>
+                        Pindahkan Unit
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
 
 @endsection
 
@@ -638,6 +1030,136 @@ $(document).ready(function () {
             table.search('');
 
             table.ajax.reload();
+        }
+    );
+
+    // =====================================================
+    // NONAKTIFKAN / PEGAWAI KELUAR
+    // =====================================================
+    $(document).on(
+        'click',
+        '.btn-deactivate-employee',
+        function () {
+
+            const employeeId =
+                $(this).data('id');
+
+            const employeeName =
+                $(this).data('nama');
+
+            const urlTemplate =
+                @json(
+                    route(
+                        'employee.deactivate',
+                        ['employee' => '__EMPLOYEE_ID__']
+                    )
+                );
+
+            const actionUrl =
+                urlTemplate.replace(
+                    '__EMPLOYEE_ID__',
+                    employeeId
+                );
+
+            // Nama pegawai
+            $('#deactivateEmployeeName')
+                .text(employeeName);
+
+            // Route form
+            $('#deactivateEmployeeForm')
+                .attr('action', actionUrl);
+
+            // Reset input
+            $('#tanggal_keluar')
+                .val('');
+
+            $('#keterangan_keluar')
+                .val('');
+
+            // Buka modal
+            const modalElement =
+                document.getElementById(
+                    'deactivateEmployeeModal'
+                );
+
+            const modal =
+                bootstrap.Modal.getOrCreateInstance(
+                    modalElement
+                );
+
+            modal.show();
+        }
+    );
+
+    // =====================================================
+    // PINDAH UNIT
+    // =====================================================
+    $(document).on(
+        'click',
+        '.btn-transfer-unit',
+        function () {
+
+            const employeeId =
+                $(this).data('id');
+
+            const employeeName =
+                $(this).data('nama');
+
+            const currentUnitId =
+                String($(this).data('unit-id'));
+
+            const urlTemplate =
+                @json(
+                    route(
+                        'employee.transferUnit',
+                        ['employee' => '__EMPLOYEE_ID__']
+                    )
+                );
+
+            const actionUrl =
+                urlTemplate.replace(
+                    '__EMPLOYEE_ID__',
+                    employeeId
+                );
+
+            // Nama pegawai
+            $('#transferEmployeeName')
+                .text(employeeName);
+
+            // Route form
+            $('#transferUnitForm')
+                .attr('action', actionUrl);
+
+            // Reset form
+            $('#transfer_unit_id')
+                .val('');
+
+            $('#tanggal_pindah')
+                .val('');
+
+            $('#keterangan_pindah')
+                .val('');
+
+            // Aktifkan semua pilihan unit dulu
+            $('#transfer_unit_id option')
+                .prop('disabled', false);
+
+            // Unit saat ini tidak boleh dipilih
+            $('#transfer_unit_id option[value="' + currentUnitId + '"]')
+                .prop('disabled', true);
+
+            // Buka modal
+            const modalElement =
+                document.getElementById(
+                    'transferUnitModal'
+                );
+
+            const modal =
+                bootstrap.Modal.getOrCreateInstance(
+                    modalElement
+                );
+
+            modal.show();
         }
     );
 

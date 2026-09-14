@@ -218,6 +218,76 @@ class AbsensiController extends Controller
                 'employeeWorkSchedules.days',
             ]);
 
+            // =====================================================
+            // FILTER UNIT BERDASARKAN PERIODE HISTORI
+            // =====================================================
+            $applyUnitPeriodFilter = function (
+                $query,
+                $unitId
+            ) use (
+                $startDate,
+                $endDate
+            ) {
+
+                $query->where(function ($q) use (
+                    $unitId,
+                    $startDate,
+                    $endDate
+                ) {
+
+                    // Pegawai yang sudah punya histori unit
+                    $q->whereHas(
+                        'unitHistories',
+                        function ($history) use (
+                            $unitId,
+                            $startDate,
+                            $endDate
+                        ) {
+
+                            $history
+                                ->where(
+                                    'unit_id',
+                                    $unitId
+                                )
+                                ->whereDate(
+                                    'tanggal_mulai',
+                                    '<=',
+                                    $endDate
+                                )
+                                ->where(
+                                    function ($period) use (
+                                        $startDate
+                                    ) {
+
+                                        $period
+                                            ->whereNull(
+                                                'tanggal_selesai'
+                                            )
+                                            ->orWhereDate(
+                                                'tanggal_selesai',
+                                                '>=',
+                                                $startDate
+                                            );
+                                    }
+                                );
+                        }
+                    )
+
+                    // Pegawai lama yang belum punya histori unit
+                    ->orWhere(function ($legacy) use ($unitId) {
+
+                        $legacy
+                            ->whereDoesntHave(
+                                'unitHistories'
+                            )
+                            ->where(
+                                'unit_id',
+                                $unitId
+                            );
+                    });
+                });
+            };
+
 
             // =====================================================
             // SECURITY UNIT
@@ -234,8 +304,8 @@ class AbsensiController extends Controller
             // =====================================================
             if ($kepsekUnitId !== null) {
 
-                $employeesQuery->where(
-                    'unit_id',
+                $applyUnitPeriodFilter(
+                    $employeesQuery,
                     $kepsekUnitId
                 );
 
@@ -245,12 +315,10 @@ class AbsensiController extends Controller
             // =====================================================
             // ADMIN / DIREKTUR / ROLE LAIN
             // =====================================================
-            elseif (
-                $request->filled('unit_id')
-            ) {
+            elseif ($request->filled('unit_id')) {
 
-                $employeesQuery->where(
-                    'unit_id',
+                $applyUnitPeriodFilter(
+                    $employeesQuery,
                     $request->unit_id
                 );
             }
@@ -367,6 +435,60 @@ class AbsensiController extends Controller
                         continue;
                     }
 
+                    // =============================================
+                    // MASA AKTIF PEGAWAI
+                    // =============================================
+
+                    // Belum mulai bekerja
+                    if (
+                        $emp->tanggal_masuk &&
+                        $tanggal < $emp->tanggal_masuk->toDateString()
+                    ) {
+                        continue;
+                    }
+
+                    // =============================================
+                    // UNIT PEGAWAI PADA TANGGAL INI
+                    // =============================================
+                    $unitIdPadaTanggal =
+                        app(\App\Services\EmployeeUnitService::class)
+                            ->getUnitId(
+                                $emp,
+                                $tanggal
+                            );
+
+
+                    // =============================================
+                    // FILTER UNIT PER TANGGAL
+                    // =============================================
+                    $filterUnitId =
+                        $kepsekUnitId !== null
+                            ? $kepsekUnitId
+                            : (
+                                $request->filled('unit_id')
+                                    ? (int) $request->unit_id
+                                    : null
+                            );
+
+
+                    if (
+                        $filterUnitId !== null
+                        &&
+                        (int) $unitIdPadaTanggal
+                            !== (int) $filterUnitId
+                    ) {
+                        continue;
+                    }
+
+                    // Sudah keluar / nonaktif
+                    // tanggal_keluar = hari TERAKHIR masih bekerja
+                    if (
+                        $emp->tanggal_keluar &&
+                        $tanggal > $emp->tanggal_keluar->toDateString()
+                    ) {
+                        continue;
+                    }
+
 
                     // =============================================
                     // JADWAL
@@ -384,7 +506,7 @@ class AbsensiController extends Controller
                     $calendar =
                         $calendarService->getCalendar(
                             $tanggal,
-                            $emp->unit_id
+                            $unitIdPadaTanggal
                         );
 
 
@@ -1319,6 +1441,37 @@ class AbsensiController extends Controller
                 continue;
             }
 
+            // =================================================
+            // MASA AKTIF PEGAWAI
+            // =================================================
+
+            // Belum mulai bekerja
+            if (
+                $employee->tanggal_masuk &&
+                $tanggal < $employee->tanggal_masuk->toDateString()
+            ) {
+                continue;
+            }
+
+            // Sudah keluar / nonaktif
+            // tanggal_keluar = hari terakhir masih bekerja
+            if (
+                $employee->tanggal_keluar &&
+                $tanggal > $employee->tanggal_keluar->toDateString()
+            ) {
+                continue;
+            }
+
+            // =================================================
+            // UNIT PEGAWAI PADA TANGGAL INI
+            // =================================================
+            $unitIdPadaTanggal =
+                app(\App\Services\EmployeeUnitService::class)
+                    ->getUnitId(
+                        $employee,
+                        $tanggal
+                    );
+
 
             // =================================================
             // JADWAL PEGAWAI
@@ -1334,7 +1487,7 @@ class AbsensiController extends Controller
             // =================================================
             $calendar = $calendarService->getCalendar(
                 $tanggal,
-                $employee->unit_id
+                $unitIdPadaTanggal
             );
 
 

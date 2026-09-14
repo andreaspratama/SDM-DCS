@@ -8,6 +8,7 @@ use App\Models\AttendancePermission;
 
 use App\Services\EmployeeScheduleService;
 use App\Services\WorkCalendarService;
+use App\Services\EmployeeUnitService;
 
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -80,6 +81,11 @@ class AttendanceExport implements
                 WorkCalendarService::class
             );
 
+        $employeeUnitService =
+            app(
+                EmployeeUnitService::class
+            );
+
 
         // =================================================
         // EMPLOYEE
@@ -94,10 +100,57 @@ class AttendanceExport implements
 
         if ($this->unitId) {
 
-            $employeesQuery->where(
-                'unit_id',
-                $this->unitId
-            );
+            $unitId = $this->unitId;
+
+            $employeesQuery->where(function ($query) use (
+                $unitId,
+                $startDate,
+                $endDate
+            ) {
+
+                // Pegawai yang sudah punya histori unit
+                $query->whereHas(
+                    'unitHistories',
+                    function ($history) use (
+                        $unitId,
+                        $startDate,
+                        $endDate
+                    ) {
+
+                        $history
+                            ->where(
+                                'unit_id',
+                                $unitId
+                            )
+                            ->whereDate(
+                                'tanggal_mulai',
+                                '<=',
+                                $endDate
+                            )
+                            ->where(function ($period) use ($startDate) {
+
+                                $period
+                                    ->whereNull('tanggal_selesai')
+                                    ->orWhereDate(
+                                        'tanggal_selesai',
+                                        '>=',
+                                        $startDate
+                                    );
+                            });
+                    }
+                )
+
+                // Pegawai lama yang belum punya histori
+                ->orWhere(function ($legacy) use ($unitId) {
+
+                    $legacy
+                        ->whereDoesntHave('unitHistories')
+                        ->where(
+                            'unit_id',
+                            $unitId
+                        );
+                });
+            });
         }
 
 
@@ -232,6 +285,48 @@ class AttendanceExport implements
 
                 $tanggal =
                     $date->toDateString();
+                
+                // =============================================
+                // MASA AKTIF PEGAWAI
+                // =============================================
+
+                // Belum mulai bekerja
+                if (
+                    $emp->tanggal_masuk &&
+                    $tanggal < $emp->tanggal_masuk->toDateString()
+                ) {
+                    continue;
+                }
+
+                // Sudah keluar / nonaktif
+                // tanggal_keluar = hari terakhir masih bekerja
+                if (
+                    $emp->tanggal_keluar &&
+                    $tanggal > $emp->tanggal_keluar->toDateString()
+                ) {
+                    continue;
+                }
+
+                // =============================================
+                // UNIT PEGAWAI PADA TANGGAL INI
+                // =============================================
+                $unitIdPadaTanggal =
+                    $employeeUnitService
+                        ->getUnitId(
+                            $emp,
+                            $tanggal
+                        );
+
+                // =============================================
+                // FILTER UNIT PER TANGGAL
+                // =============================================
+                if (
+                    $this->unitId
+                    &&
+                    (int) $unitIdPadaTanggal !== (int) $this->unitId
+                ) {
+                    continue;
+                }
 
 
                 // =============================================
@@ -252,7 +347,7 @@ class AttendanceExport implements
                     $calendarService
                         ->getCalendar(
                             $tanggal,
-                            $emp->unit_id
+                            $unitIdPadaTanggal
                         );
 
 
@@ -827,8 +922,9 @@ class AttendanceExport implements
                 $emp->nama,
 
                 // B
-                $emp->unit?->nama
-                    ?? '-',
+                $this->unitId
+                    ? \App\Models\Unit::find($this->unitId)?->nama ?? '-'
+                    : $emp->unit?->nama ?? '-',
 
                 // C
                 $summary[

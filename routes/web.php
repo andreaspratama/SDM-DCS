@@ -53,6 +53,8 @@ Route::prefix('admin')
         Route::get('/employee', [EmployeeController::class, 'index'])->name('employee.index');
         Route::get('/employee/upload', [EmployeeController::class, 'formUpload'])->name('employee.upload.form');
         Route::post('/employee/upload', [EmployeeController::class, 'upload'])->name('employee.upload');
+        Route::post('/employee/{employee}/deactivate', [EmployeeController::class, 'deactivate'])->name('employee.deactivate');
+        Route::post('/employee/{employee}/transfer-unit', [EmployeeController::class, 'transferUnit'])->name('employee.transferUnit');
 
         // TOKEN
         Route::get('/unit-form-token', [UnitFormTokenController::class, 'index'])->name('unitFormToken.index');

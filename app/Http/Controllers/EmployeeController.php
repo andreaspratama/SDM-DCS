@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Employee;
 use App\Models\Unit;
+use App\Models\WorkSchedule;
 use Yajra\DataTables\Facades\DataTables;
 
 class EmployeeController extends Controller
@@ -12,7 +13,16 @@ class EmployeeController extends Controller
     public function index()
     {
         $units = Unit::orderBy('nama')->get();
-        return view('pages.employee.index', compact('units'));
+
+        $workSchedules = WorkSchedule::orderBy('nama')->get();
+
+        return view(
+            'pages.employee.index',
+            compact(
+                'units',
+                'workSchedules'
+            )
+        );
     }
 
     public function datatable(Request $request)
@@ -21,6 +31,7 @@ class EmployeeController extends Controller
             ->with([
                 'unit:id,nama',
                 'workSchedule:id,nama',
+                'unitHistories.unit:id,nama',
             ])
             ->select([
                 'id',
@@ -29,6 +40,8 @@ class EmployeeController extends Controller
                 'unit_id',
                 'role',
                 'work_schedule_id',
+                'is_active',
+                'tanggal_keluar',
             ]);
 
 
@@ -72,7 +85,58 @@ class EmployeeController extends Controller
             })
 
             ->addColumn('unit', function ($row) {
-                return $row->unit?->nama ?? '-';
+
+                $unitAktif =
+                    $row->unit?->nama ?? '-';
+
+                $mutasiTerjadwal =
+                    $row->unitHistories
+                        ->filter(function ($history) {
+
+                            return
+                                $history->tanggal_mulai
+                                && $history->tanggal_mulai->isFuture()
+                                && is_null($history->tanggal_selesai);
+                        })
+                        ->sortBy('tanggal_mulai')
+                        ->first();
+
+
+                if (!$mutasiTerjadwal) {
+
+                    return '
+                        <span class="unit-text">'
+                            . e($unitAktif) .
+                        '</span>
+                    ';
+                }
+
+
+                $unitTujuan =
+                    $mutasiTerjadwal->unit?->nama
+                    ?? '-';
+
+                $tanggalEfektif =
+                    $mutasiTerjadwal
+                        ->tanggal_mulai
+                        ->format('d/m/Y');
+
+
+                return '
+                    <div>
+                        <div class="unit-text">
+                            ' . e($unitAktif) . '
+                        </div>
+
+                        <div class="mt-1">
+                            <span class="badge text-bg-info">
+                                <i class="bi bi-arrow-right me-1"></i>
+                                ' . e($unitTujuan) . '
+                                mulai ' . e($tanggalEfektif) . '
+                            </span>
+                        </div>
+                    </div>
+                ';
             })
 
             ->addColumn('jabatan', function ($row) {
@@ -103,24 +167,450 @@ class EmployeeController extends Controller
 
             ->addColumn('aksi', function ($row) {
 
-                return '
-                    <a href="' .
-                        route('employeeOrganization.edit', $row->id) .
-                    '"
+                $atur = '
+                    <a href="' . route('employeeOrganization.edit', $row->id) . '"
                     class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil-square"></i>
                         Atur
                     </a>
                 ';
+
+                // Pegawai sudah nonaktif
+                if (!$row->is_active) {
+
+                    $tanggalKeluar = $row->tanggal_keluar
+                        ? \Carbon\Carbon::parse($row->tanggal_keluar)->format('d/m/Y')
+                        : '-';
+
+                    return '
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            ' . $atur . '
+
+                            <span
+                                class="badge text-bg-secondary"
+                                title="Tanggal keluar: ' . e($tanggalKeluar) . '"
+                            >
+                                Nonaktif
+                            </span>
+                        </div>
+                    ';
+                }
+
+                // Pegawai masih aktif
+                return '
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+
+                        ' . $atur . '
+
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-success btn-transfer-unit"
+                            data-id="' . $row->id . '"
+                            data-nama="' . e($row->nama) . '"
+                            data-unit-id="' . $row->unit_id . '"
+                        >
+                            <i class="bi bi-arrow-left-right"></i>
+                            Pindah Unit
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger btn-deactivate-employee"
+                            data-id="' . $row->id . '"
+                            data-nama="' . e($row->nama) . '"
+                        >
+                            <i class="bi bi-person-x"></i>
+                            Keluar
+                        </button>
+
+                    </div>
+                ';
             })
 
             ->rawColumns([
+                'unit',
                 'jabatan',
                 'jadwal',
                 'aksi',
             ])
 
             ->toJson();
+    }
+
+    public function deactivate(Request $request, Employee $employee)
+    {
+        $validated = $request->validate([
+            'tanggal_keluar' => 'required|date|before_or_equal:today',
+            'keterangan'     => 'nullable|string|max:255',
+        ]);
+
+        if (!$employee->is_active) {
+            return back()->with(
+                'error',
+                'Pegawai ini sudah berstatus nonaktif.'
+            );
+        }
+
+        $tanggalKeluar = \Carbon\Carbon::parse(
+            $validated['tanggal_keluar']
+        )->toDateString();
+
+
+        \Illuminate\Support\Facades\DB::transaction(
+            function () use (
+                $employee,
+                $validated,
+                $tanggalKeluar
+            ) {
+
+                // =====================================================
+                // 1. HAPUS MUTASI UNIT YANG BELUM BERLAKU
+                // =====================================================
+                $employee->unitHistories()
+                    ->whereDate(
+                        'tanggal_mulai',
+                        '>',
+                        $tanggalKeluar
+                    )
+                    ->delete();
+
+
+                // =====================================================
+                // 2. CARI RIWAYAT UNIT YANG BERLAKU SAAT PEGAWAI KELUAR
+                // =====================================================
+                $riwayatAktif =
+                    $employee->unitHistories()
+                        ->whereDate(
+                            'tanggal_mulai',
+                            '<=',
+                            $tanggalKeluar
+                        )
+                        ->where(function ($query) use ($tanggalKeluar) {
+
+                            $query
+                                ->whereNull('tanggal_selesai')
+                                ->orWhereDate(
+                                    'tanggal_selesai',
+                                    '>=',
+                                    $tanggalKeluar
+                                );
+                        })
+                        ->orderByDesc('tanggal_mulai')
+                        ->first();
+
+
+                // =====================================================
+                // 3. TUTUP RIWAYAT UNIT PADA TANGGAL KELUAR
+                // =====================================================
+                if ($riwayatAktif) {
+
+                    $keteranganKeluar =
+                        $validated['keterangan']
+                        ?? 'Pegawai keluar / nonaktif';
+
+
+                    $riwayatAktif->update([
+                        'tanggal_selesai' =>
+                            $tanggalKeluar,
+
+                        'keterangan' =>
+                            trim(
+                                (
+                                    $riwayatAktif->keterangan
+                                        ? $riwayatAktif->keterangan . ' | '
+                                        : ''
+                                )
+                                . $keteranganKeluar
+                            ),
+                    ]);
+                }
+
+
+                // =====================================================
+                // 4. NONAKTIFKAN PEGAWAI
+                // =====================================================
+                $employee->update([
+                    'is_active' =>
+                        false,
+
+                    'tanggal_keluar' =>
+                        $tanggalKeluar,
+                ]);
+            }
+        );
+
+
+        return back()->with(
+            'success',
+            $employee->nama .
+            ' berhasil dinonaktifkan per ' .
+            \Carbon\Carbon::parse($tanggalKeluar)
+                ->format('d/m/Y') .
+            '. Mutasi unit yang belum berlaku telah dibatalkan.'
+        );
+    }
+
+    public function transferUnit(Request $request, Employee $employee)
+    {
+        $validated = $request->validate([
+            'unit_id'          => 'required|exists:units,id',
+            'work_schedule_id' => 'required|exists:work_schedules,id',
+            'tanggal_pindah'   => 'required|date',
+            'keterangan'       => 'nullable|string|max:255',
+        ]);
+
+        // Pegawai nonaktif tidak boleh dipindahkan
+        if (!$employee->is_active) {
+            return back()->with(
+                'error',
+                'Pegawai nonaktif tidak dapat dipindahkan unit.'
+            );
+        }
+
+        $unitBaru = Unit::findOrFail(
+            $validated['unit_id']
+        );
+
+        // Tidak boleh pindah ke unit yang sama
+        if ((int) $employee->unit_id === (int) $unitBaru->id) {
+            return back()->with(
+                'error',
+                'Unit tujuan sama dengan unit pegawai saat ini.'
+            );
+        }
+
+        $tanggalPindah = \Carbon\Carbon::parse(
+            $validated['tanggal_pindah']
+        )->startOfDay();
+
+        $today = \Carbon\Carbon::today();
+
+        // Tanggal pindah tidak boleh sebelum tanggal masuk
+        if (
+            $employee->tanggal_masuk &&
+            $tanggalPindah->lt(
+                $employee->tanggal_masuk->copy()->startOfDay()
+            )
+        ) {
+            return back()->with(
+                'error',
+                'Tanggal pindah tidak boleh sebelum tanggal masuk pegawai.'
+            );
+        }
+
+
+        // =====================================================
+        // CEK APAKAH SUDAH ADA PINDAH UNIT TERJADWAL
+        // =====================================================
+        $scheduledTransfer =
+            $employee->unitHistories()
+                ->whereDate(
+                    'tanggal_mulai',
+                    '>',
+                    $today->toDateString()
+                )
+                ->whereNull('tanggal_selesai')
+                ->first();
+
+        if ($scheduledTransfer) {
+
+            return back()->with(
+                'error',
+                'Pegawai ini sudah memiliki pindah unit terjadwal.'
+            );
+        }
+
+
+        \Illuminate\Support\Facades\DB::transaction(
+            function () use (
+                $employee,
+                $unitBaru,
+                $tanggalPindah,
+                $today,
+                $validated
+            ) {
+
+                $unitLamaId =
+                    $employee->unit_id;
+
+                $tanggalSelesaiUnitLama =
+                    $tanggalPindah
+                        ->copy()
+                        ->subDay()
+                        ->toDateString();
+
+
+                // =====================================================
+                // CARI RIWAYAT UNIT AKTIF / TERKINI
+                // =====================================================
+                $riwayatAktif =
+                    $employee->unitHistories()
+                        ->whereNull('tanggal_selesai')
+                        ->whereDate(
+                            'tanggal_mulai',
+                            '<=',
+                            $today->toDateString()
+                        )
+                        ->orderByDesc('tanggal_mulai')
+                        ->first();
+
+
+                // =====================================================
+                // SUDAH PUNYA RIWAYAT UNIT
+                // =====================================================
+                if ($riwayatAktif) {
+
+                    if (
+                        $tanggalPindah->lte(
+                            $riwayatAktif
+                                ->tanggal_mulai
+                                ->copy()
+                                ->startOfDay()
+                        )
+                    ) {
+
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'tanggal_pindah' =>
+                                'Tanggal pindah harus setelah tanggal mulai unit saat ini.',
+                        ]);
+                    }
+
+
+                    $riwayatAktif->update([
+                        'tanggal_selesai' =>
+                            $tanggalSelesaiUnitLama,
+
+                        'keterangan' =>
+                            'Pindah ke ' .
+                            $unitBaru->nama .
+                            (
+                                !empty($validated['keterangan'])
+                                    ? ' - ' . $validated['keterangan']
+                                    : ''
+                            ),
+                    ]);
+
+                } else {
+
+                    // =================================================
+                    // PEGAWAI LAMA BELUM PUNYA RIWAYAT UNIT
+                    // =================================================
+
+                    $tanggalAwal =
+                        $employee->tanggal_masuk
+                            ? $employee->tanggal_masuk->toDateString()
+                            : \App\Models\Attendance::where(
+                                'employee_id',
+                                $employee->id
+                            )->min('date');
+
+
+                    if (
+                        !$tanggalAwal &&
+                        $employee->created_at
+                    ) {
+
+                        $tanggalAwal =
+                            $employee->created_at
+                                ->toDateString();
+                    }
+
+
+                    if (
+                        $tanggalAwal &&
+                        $tanggalAwal <=
+                            $tanggalSelesaiUnitLama
+                    ) {
+
+                        $employee
+                            ->unitHistories()
+                            ->create([
+                                'unit_id' =>
+                                    $unitLamaId,
+                                
+                                'work_schedule_id' =>
+                                    $employee->work_schedule_id,
+
+                                'tanggal_mulai' =>
+                                    $tanggalAwal,
+
+                                'tanggal_selesai' =>
+                                    $tanggalSelesaiUnitLama,
+
+                                'keterangan' =>
+                                    'Riwayat unit sebelum pindah ke ' .
+                                    $unitBaru->nama,
+                            ]);
+                    }
+                }
+
+
+                // =====================================================
+                // BUAT UNIT BARU
+                // =====================================================
+                $employee
+                    ->unitHistories()
+                    ->create([
+                        'unit_id' =>
+                            $unitBaru->id,
+                        
+                        'work_schedule_id' =>
+                            $validated['work_schedule_id'],
+
+                        'tanggal_mulai' =>
+                            $tanggalPindah
+                                ->toDateString(),
+
+                        'tanggal_selesai' =>
+                            null,
+
+                        'keterangan' =>
+                            $validated['keterangan']
+                                ?? 'Pindah unit',
+                    ]);
+
+
+                // =====================================================
+                // JIKA TANGGAL PINDAH SUDAH BERLAKU
+                // =====================================================
+                if ($tanggalPindah->lte($today)) {
+
+                    $employee->update([
+                        'unit_id' =>
+                            $unitBaru->id,
+
+                        'work_schedule_id' =>
+                            $validated['work_schedule_id'],
+                    ]);
+                }
+
+                // Kalau tanggal pindah masih di masa depan:
+                // employees.unit_id TIDAK diubah dulu.
+            }
+        );
+
+
+        if ($tanggalPindah->isFuture()) {
+
+            return back()->with(
+                'success',
+                $employee->nama .
+                ' dijadwalkan pindah ke unit ' .
+                $unitBaru->nama .
+                ' mulai ' .
+                $tanggalPindah->format('d/m/Y') .
+                '.'
+            );
+        }
+
+
+        return back()->with(
+            'success',
+            $employee->nama .
+            ' berhasil dipindahkan ke unit ' .
+            $unitBaru->nama .
+            '.'
+        );
     }
 
     public function formUpload()

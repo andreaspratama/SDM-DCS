@@ -9,6 +9,15 @@ class Employee extends Model
 {
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'is_active'     => 'boolean',
+            'tanggal_masuk' => 'date',
+            'tanggal_keluar'=> 'date',
+        ];
+    }
+
     public function unit()
     {
         return $this->belongsTo(Unit::class);
@@ -37,5 +46,10 @@ class Employee extends Model
     public function user()
     {
         return $this->hasOne(User::class);
+    }
+
+    public function unitHistories(): HasMany
+    {
+        return $this->hasMany(EmployeeUnitHistory::class);
     }
 }
