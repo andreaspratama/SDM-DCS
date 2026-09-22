@@ -186,13 +186,13 @@
                                 <th>Nama</th>
                                 <th>Total Hadir</th>
                                 <th>Tidak Masuk</th>
-                                <th>Telat</th>
-                                <th>Menit Telat</th>
+                                <th>Terlambat</th>
+                                <th>Menit Terlambat</th>
                                 <th>Pulang Cepat</th>
                                 <th>Menit Pulang Cepat</th>
                                 <th>Tanpa Ket</th>
                                 <th>Keluar Tanpa Izin</th>
-                                <th>Total Jam</th>
+                                <th>Menit Pergi Tanpa Izin</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -301,7 +301,7 @@
 
                     { data:'keluar_tanpa_izin', name:'keluar_tanpa_izin' },
 
-                    { data:'total_jam', name:'total_jam' },
+                    { data:'menit_keluar_tanpa_izin', name:'menit_keluar_tanpa_izin' },
 
                     {
                         data:'aksi',

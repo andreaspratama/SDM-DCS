@@ -761,10 +761,9 @@ class EmployeeController extends Controller
             // =====================================================
             // CARI UNIT
             // =====================================================
-            $unit = Unit::where(
-                'nama',
-                $unitName
-            )->first();
+            $unit = Unit::where('nama', $unitName)
+                ->orWhere('code', $unitName)
+                ->first();
 
 
             if (!$unit) {

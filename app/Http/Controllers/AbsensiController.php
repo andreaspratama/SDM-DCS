@@ -411,6 +411,8 @@ class AbsensiController extends Controller
 
                     'keluar_tanpa_izin' => 0,
 
+                    'total_menit_keluar_tanpa_izin' => 0,
+
                     'total_menit' => 0,
 
                     'tidak_masuk' => 0,
@@ -1037,9 +1039,25 @@ class AbsensiController extends Controller
 
                             if (!$adaIzin) {
 
+                                // Jumlah kejadian keluar tanpa izin
                                 $summary[
                                     'keluar_tanpa_izin'
                                 ]++;
+
+                                // Total durasi keluar tanpa izin dalam menit
+                                if (
+                                    $jamKembali->gt(
+                                        $jamKeluar
+                                    )
+                                ) {
+
+                                    $summary[
+                                        'total_menit_keluar_tanpa_izin'
+                                    ] += (int) $jamKeluar
+                                        ->diffInMinutes(
+                                            $jamKembali
+                                        );
+                                }
                             }
                         }
 
@@ -1245,13 +1263,10 @@ class AbsensiController extends Controller
                             'keluar_tanpa_izin'
                         ],
 
-                    'total_jam' =>
-                        round(
-                            $summary[
-                                'total_menit'
-                            ] / 60,
-                            1
-                        ),
+                    'menit_keluar_tanpa_izin' =>
+                        $summary[
+                            'total_menit_keluar_tanpa_izin'
+                        ],
 
                     'aksi' =>
                         route(

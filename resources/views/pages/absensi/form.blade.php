@@ -152,14 +152,14 @@
                           <div class="small">
 
                               <div>
-                                  <strong>UM, SHS dan PS Gama</strong>
+                                  <strong>UM, SH dan GM</strong>
                                   menyimpan raw scan terlebih dahulu dan setelah upload
                                   harus dilanjutkan dengan
                                   <strong>Process Data</strong>.
                               </div>
 
                               <div class="mt-1">
-                                  <strong>Elementary, JHS dan PS Tama</strong>
+                                  <strong>EL, JH dan TM</strong>
                                   langsung menghasilkan data attendance dan tidak perlu
                                   Process Data.
                               </div>

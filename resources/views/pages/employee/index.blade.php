@@ -749,7 +749,7 @@
                             id="keterangan_pindah"
                             class="form-control"
                             rows="3"
-                            placeholder="Contoh: Mutasi dari UM ke Elementary..."
+                            placeholder="Contoh: Mutasi dari UM ke EL..."
                         ></textarea>
 
                     </div>

@@ -103,7 +103,7 @@
                                 name="nama"
                                 class="form-control"
                                 value="{{ old('nama') }}"
-                                placeholder="Contoh: SHS Perpus"
+                                placeholder="Contoh: SH Perpus"
                                 required
                             >
 
