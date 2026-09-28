@@ -4172,14 +4172,16 @@ class AbsensiController extends Controller
     public function export(Request $request)
     {
         $this->abortIfKepalaBidang();
-        
+
+        // =====================================================
+        // USER LOGIN
+        // =====================================================
+        $user = auth()->user();
+
+
         // =====================================================
         // SECURITY UNIT
         // =====================================================
-        $user =
-            auth()->user();
-
-
         $kepsekUnitId =
             $this->getKepalaSekolahUnitId();
 
@@ -4196,7 +4198,9 @@ class AbsensiController extends Controller
                 : null;
 
 
-        // TU wajib mempunyai unit
+        // =====================================================
+        // TU WAJIB PUNYA UNIT
+        // =====================================================
         if (
             $isTU
             &&
@@ -4211,7 +4215,11 @@ class AbsensiController extends Controller
 
 
         // =====================================================
-        // UNIT TERKUNCI
+        // UNIT EXPORT
+        //
+        // Kepala Sekolah = unit dari employee login
+        // TU             = unit dari users.unit_id
+        // Admin          = unit dari request
         // =====================================================
         $lockedUnitId =
             $isTU
@@ -4223,19 +4231,22 @@ class AbsensiController extends Controller
                 );
 
 
-        // =====================================================
-        // UNIT EXPORT
-        // =====================================================
         if ($lockedUnitId !== null) {
 
-            // Kepsek / TU
-            // Request unit dari URL diabaikan
+            // =============================================
+            // KEPALA SEKOLAH / TU
+            // Unit dari request TIDAK dipercaya
+            // =============================================
+
             $unitId =
                 $lockedUnitId;
 
         } else {
 
-            // Admin / Direktur
+            // =============================================
+            // ADMIN / ROLE LAIN
+            // =============================================
+
             $unitId =
                 $request->filled('unit_id')
                     ? (int) $request->unit_id
@@ -4243,67 +4254,148 @@ class AbsensiController extends Controller
         }
 
 
+        // =====================================================
+        // TANGGAL
+        // =====================================================
         $startDate =
             $request->start_date;
 
         $endDate =
             $request->end_date;
 
-        // ==========================
+
+        // =====================================================
         // DEFAULT TANGGAL
-        // ==========================
+        // =====================================================
+        if (
+            !$startDate
+            ||
+            !$endDate
+        ) {
 
-        if (!$startDate || !$endDate) {
+            $startDate =
+                \Carbon\Carbon::now()
+                    ->startOfMonth()
+                    ->toDateString();
 
-            $startDate = \Carbon\Carbon::now()
-                ->startOfMonth()
-                ->toDateString();
-
-            $endDate = \Carbon\Carbon::now()
-                ->endOfMonth()
-                ->toDateString();
+            $endDate =
+                \Carbon\Carbon::now()
+                    ->endOfMonth()
+                    ->toDateString();
         }
 
-        // ==========================
-        // NAMA UNIT
-        // ==========================
 
+        // =====================================================
+        // NAMA UNIT
+        // =====================================================
         if ($unitId) {
 
-            $unit = Unit::find($unitId);
+            $unit =
+                Unit::find($unitId);
 
-            $namaUnit = $unit
-                ? $unit->nama
-                : 'Unit';
+            $namaUnit =
+                $unit
+                    ? $unit->nama
+                    : 'Unit';
 
         } else {
 
-            $namaUnit = 'Semua_Unit';
+            $namaUnit =
+                'Semua_Unit';
         }
 
-        // ==========================
-        // NAMA FILE
-        // ==========================
 
+        // =====================================================
+        // NAMA KEPALA SEKOLAH UNTUK TTD
+        // =====================================================
+        $namaTtd = null;
+
+
+        if ($unitId) {
+
+            $kepalaSekolah =
+                Employee::where(
+                    'unit_id',
+                    $unitId
+                )
+                ->where(
+                    'role',
+                    'Kepala Sekolah'
+                )
+                ->orderBy('nama')
+                ->first();
+
+
+            if ($kepalaSekolah) {
+
+                $namaTtd =
+                    $kepalaSekolah->nama;
+            }
+        }
+
+
+        // =====================================================
+        // FALLBACK
+        //
+        // Kalau yang export adalah Kepala Sekolah
+        // dan data employee ditemukan dari akun login,
+        // gunakan nama dirinya.
+        // =====================================================
+        if (
+            !$namaTtd
+            &&
+            $kepsekUnitId !== null
+            &&
+            $user?->employee_id
+        ) {
+
+            $namaTtd =
+                Employee::where(
+                    'id',
+                    $user->employee_id
+                )
+                ->value('nama');
+        }
+
+
+        // =====================================================
+        // FALLBACK TERAKHIR
+        // =====================================================
+        if (!$namaTtd) {
+
+            $namaTtd =
+                '-';
+        }
+
+
+        // =====================================================
+        // NAMA FILE
+        // =====================================================
         $namaFile =
             'Rekap_Absensi_' .
             $namaUnit . '_' .
-            \Carbon\Carbon::parse($startDate)->format('d-m-Y') .
+            \Carbon\Carbon::parse(
+                $startDate
+            )->format('d-m-Y') .
             '_sampai_' .
-            \Carbon\Carbon::parse($endDate)->format('d-m-Y') .
+            \Carbon\Carbon::parse(
+                $endDate
+            )->format('d-m-Y') .
             '.xlsx';
 
-        // ==========================
-        // DOWNLOAD
-        // ==========================
 
+        // =====================================================
+        // DOWNLOAD
+        // =====================================================
         return \Maatwebsite\Excel\Facades\Excel::download(
+
             new \App\Exports\AttendanceExport(
                 $startDate,
                 $endDate,
                 $unitId,
-                auth()->user()?->name
+                $namaTtd
             ),
+
             $namaFile
         );
     }
