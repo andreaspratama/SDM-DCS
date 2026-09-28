@@ -195,7 +195,7 @@
         </h2>
 
         <p>
-            Kelola akun Administrator dan Pimpinan yang dapat masuk ke sistem.
+            Kelola akun Administrator, Pimpinan, dan TU yang dapat masuk ke sistem.
         </p>
 
     </div>
@@ -396,10 +396,28 @@
                                         Administrator
                                     </span>
 
-                                @else
+                                @elseif($user->role === 'Pimpinan')
 
                                     <span class="role-badge role-pimpinan">
                                         Pimpinan
+                                    </span>
+
+                                @elseif($user->role === 'TU')
+
+                                    <span
+                                        class="role-badge"
+                                        style="
+                                            background:#dcfce7;
+                                            color:#15803d;
+                                        "
+                                    >
+                                        TU
+                                    </span>
+
+                                @else
+
+                                    <span class="role-badge">
+                                        {{ $user->role }}
                                     </span>
 
                                 @endif
@@ -454,20 +472,22 @@
                             {{-- UNIT --}}
                             <td>
 
-                                @if($user->employee)
+                                @if($user->role === 'TU')
 
                                     <div class="fw-semibold">
+                                        {{ $user->unit?->nama ?? '-' }}
+                                    </div>
 
+                                @elseif($user->employee)
+
+                                    <div class="fw-semibold">
                                         {{ $user->employee->unit?->nama ?? '-' }}
-
                                     </div>
 
                                     @if($user->employee->division)
 
                                         <div class="small text-muted mt-1">
-
                                             {{ $user->employee->division->nama }}
-
                                         </div>
 
                                     @endif
@@ -646,28 +666,84 @@
 
                                                     <option
                                                         value="Admin"
-                                                        @selected(
-                                                            $user->role === 'Admin'
-                                                        )
+                                                        @selected($user->role === 'Admin')
                                                     >
                                                         Administrator
                                                     </option>
 
                                                     <option
                                                         value="Pimpinan"
-                                                        @selected(
-                                                            $user->role === 'Pimpinan'
-                                                        )
+                                                        @selected($user->role === 'Pimpinan')
                                                     >
                                                         Pimpinan
+                                                    </option>
+
+                                                    <option
+                                                        value="TU"
+                                                        @selected($user->role === 'TU')
+                                                    >
+                                                        TU
                                                     </option>
 
                                                 </select>
 
                                             </div>
 
+                                            {{-- UNIT KHUSUS TU --}}
+                                            <div
+                                                class="mb-3 edit-unit-wrapper"
+                                                id="editUnitWrapper{{ $user->id }}"
+                                                style="display:none;"
+                                            >
 
-                                            {{-- EMPLOYEE --}}
+                                                <label class="form-label fw-semibold">
+
+                                                    Unit
+
+                                                    <span class="text-danger">
+                                                        *
+                                                    </span>
+
+                                                </label>
+
+
+                                                <select
+                                                    name="unit_id"
+                                                    id="editUnit{{ $user->id }}"
+                                                    class="form-select"
+                                                >
+
+                                                    <option value="">
+                                                        -- Pilih Unit --
+                                                    </option>
+
+
+                                                    @foreach(\App\Models\Unit::orderBy('nama')->get() as $unit)
+
+                                                        <option
+                                                            value="{{ $unit->id }}"
+                                                            @selected(
+                                                                $user->unit_id == $unit->id
+                                                            )
+                                                        >
+                                                            {{ $unit->nama }}
+                                                        </option>
+
+                                                    @endforeach
+
+                                                </select>
+
+
+                                                <div class="form-text">
+
+                                                    Unit yang dipilih menjadi batas akses akun TU.
+
+                                                </div>
+
+                                            </div>
+
+
+                                            {{-- EMPLOYEE KHUSUS PIMPINAN --}}
                                             <div
                                                 class="mb-3 edit-employee-wrapper"
                                                 id="editEmployeeWrapper{{ $user->id }}"
@@ -677,16 +753,21 @@
 
                                                     Hubungkan dengan Pegawai
 
+                                                    <span class="text-danger">
+                                                        *
+                                                    </span>
+
                                                 </label>
 
 
                                                 <select
                                                     name="employee_id"
+                                                    id="editEmployee{{ $user->id }}"
                                                     class="form-select"
                                                 >
 
                                                     <option value="">
-                                                        -- Tidak Terhubung --
+                                                        -- Pilih Pegawai --
                                                     </option>
 
 
@@ -695,8 +776,7 @@
                                                         <option
                                                             value="{{ $employee->id }}"
                                                             @selected(
-                                                                $user->employee_id
-                                                                == $employee->id
+                                                                $user->employee_id == $employee->id
                                                             )
                                                         >
 
@@ -705,6 +785,11 @@
                                                             {{ $employee->role }}
                                                             —
                                                             {{ $employee->unit?->nama }}
+
+                                                            @if($employee->division)
+                                                                —
+                                                                {{ $employee->division->nama }}
+                                                            @endif
 
                                                         </option>
 
@@ -1281,19 +1366,99 @@ document.addEventListener('DOMContentLoaded', function () {
                 const userId =
                     select.dataset.user;
 
-                const wrapper =
+
+                const employeeWrapper =
                     document.getElementById(
                         'editEmployeeWrapper' + userId
                     );
 
-                if (!wrapper) {
+
+                const unitWrapper =
+                    document.getElementById(
+                        'editUnitWrapper' + userId
+                    );
+
+
+                const employeeSelect =
+                    document.getElementById(
+                        'editEmployee' + userId
+                    );
+
+
+                const unitSelect =
+                    document.getElementById(
+                        'editUnit' + userId
+                    );
+
+
+                if (
+                    !employeeWrapper ||
+                    !unitWrapper
+                ) {
                     return;
                 }
 
-                wrapper.style.display =
-                    select.value === 'Pimpinan'
-                        ? 'block'
-                        : 'none';
+
+                // =================================================
+                // PIMPINAN
+                // =================================================
+
+                if (select.value === 'Pimpinan') {
+
+                    employeeWrapper.style.display = '';
+
+                    unitWrapper.style.display = 'none';
+
+                    employeeSelect.required = true;
+
+                    unitSelect.required = false;
+
+                    // Unit TU tidak perlu dikirim
+                    unitSelect.value = '';
+
+                }
+
+
+                // =================================================
+                // TU
+                // =================================================
+
+                else if (select.value === 'TU') {
+
+                    employeeWrapper.style.display = 'none';
+
+                    unitWrapper.style.display = '';
+
+                    employeeSelect.required = false;
+
+                    unitSelect.required = true;
+
+                    // Employee tidak boleh terhubung
+                    employeeSelect.value = '';
+
+                }
+
+
+                // =================================================
+                // ADMIN
+                // =================================================
+
+                else {
+
+                    employeeWrapper.style.display = 'none';
+
+                    unitWrapper.style.display = 'none';
+
+                    employeeSelect.required = false;
+
+                    unitSelect.required = false;
+
+                    employeeSelect.value = '';
+
+                    unitSelect.value = '';
+
+                }
+
             }
 
 
@@ -1302,7 +1467,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 toggle
             );
 
+
+            // Jalankan saat halaman dibuka
             toggle();
+
         });
 
 

@@ -246,7 +246,6 @@ class UserManagementController extends Controller
     ) {
         $this->ensureAdmin();
 
-
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -271,9 +270,32 @@ class UserManagementController extends Controller
                 Rule::in([
                     'Admin',
                     'Pimpinan',
+                    'TU',
                 ]),
             ],
 
+            // =================================================
+            // UNIT
+            // Wajib hanya untuk TU
+            // =================================================
+            'unit_id' => [
+                Rule::requiredIf(
+                    fn () =>
+                        $request->role === 'TU'
+                ),
+
+                'nullable',
+
+                Rule::exists(
+                    'units',
+                    'id'
+                ),
+            ],
+
+            // =================================================
+            // EMPLOYEE
+            // Wajib hanya untuk Pimpinan
+            // =================================================
             'employee_id' => [
                 Rule::requiredIf(
                     fn () =>
@@ -293,22 +315,27 @@ class UserManagementController extends Controller
                 )->ignore($user->id),
             ],
 
-            /*
-             * Password boleh kosong saat edit.
-             * Kalau kosong → password lama tetap.
-             */
+            // =================================================
+            // PASSWORD
+            // Kosong = password lama tetap
+            // =================================================
             'password' => [
                 'nullable',
                 'string',
                 'min:8',
                 'confirmed',
             ],
+
         ], [
+
             'employee_id.required' =>
                 'Akun Pimpinan wajib dihubungkan dengan pegawai.',
 
             'employee_id.unique' =>
-                'Pegawai tersebut sudah mempunyai akun lain.',
+                'Pegawai tersebut sudah mempunyai akun login lain.',
+
+            'unit_id.required' =>
+                'Unit wajib dipilih untuk akun TU.',
 
             'email.unique' =>
                 'Email tersebut sudah digunakan.',
@@ -321,8 +348,11 @@ class UserManagementController extends Controller
         ]);
 
 
+        // =====================================================
+        // AMBIL EMPLOYEE
+        // Hanya jika ada employee_id
+        // =====================================================
         $employee = null;
-
 
         if (!empty($validated['employee_id'])) {
 
@@ -332,9 +362,9 @@ class UserManagementController extends Controller
         }
 
 
-        // =================================================
-        // VALIDASI PIMPINAN
-        // =================================================
+        // =====================================================
+        // VALIDASI KHUSUS PIMPINAN
+        // =====================================================
         if ($validated['role'] === 'Pimpinan') {
 
             $allowedLeadershipRoles = [
@@ -342,7 +372,6 @@ class UserManagementController extends Controller
                 'Kepala Bidang',
                 'Kepala Sekolah',
             ];
-
 
             if (
                 !$employee
@@ -364,10 +393,10 @@ class UserManagementController extends Controller
         }
 
 
-        // =================================================
-        // JANGAN BIARKAN ADMIN MENGHILANGKAN ROLE ADMIN
-        // DARI AKUN YANG SEDANG DIPAKAI SENDIRI
-        // =================================================
+        // =====================================================
+        // JANGAN BIARKAN ADMIN MENGHILANGKAN
+        // ROLE ADMIN DARI AKUN SENDIRI
+        // =====================================================
         if (
             auth()->id() === $user->id
             &&
@@ -383,6 +412,27 @@ class UserManagementController extends Controller
         }
 
 
+        // =====================================================
+        // TENTUKAN UNIT
+        // =====================================================
+
+        if ($validated['role'] === 'TU') {
+
+            // TU mengambil unit dari form
+            $unitId = $validated['unit_id'];
+
+        } else {
+
+            // Admin / Pimpinan
+            // Unit mengikuti employee
+            $unitId = $employee?->unit_id;
+        }
+
+
+        // =====================================================
+        // DATA UPDATE
+        // =====================================================
+
         $data = [
             'name' => $validated['name'],
 
@@ -390,13 +440,21 @@ class UserManagementController extends Controller
 
             'role' => $validated['role'],
 
-            'unit_id' => $employee?->unit_id,
+            'unit_id' => $unitId,
 
-            'employee_id' => $employee?->id,
+            // Hanya Pimpinan yang mempunyai employee
+            'employee_id' =>
+                $validated['role'] === 'Pimpinan'
+                    ? $employee?->id
+                    : null,
         ];
 
 
-        // Password hanya diganti kalau diisi
+        // =====================================================
+        // PASSWORD
+        // Hanya update jika diisi
+        // =====================================================
+
         if (!empty($validated['password'])) {
 
             $data['password'] = Hash::make(
@@ -404,6 +462,10 @@ class UserManagementController extends Controller
             );
         }
 
+
+        // =====================================================
+        // UPDATE
+        // =====================================================
 
         $user->update($data);
 
