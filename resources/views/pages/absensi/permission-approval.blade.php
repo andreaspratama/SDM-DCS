@@ -63,7 +63,9 @@
                                     <th>Keterangan</th>
                                     <th>Status</th>
                                     <th>Lampiran</th>
-                                    <th width="260">Aksi</th>
+                                    @if(!$isTU)
+                                        <th width="260">Aksi</th>
+                                    @endif
                                 </tr>
                             </thead>
 
@@ -314,75 +316,77 @@
                                         </td>
 
 
-                                        {{-- AKSI --}}
-                                        <td>
+                                        @if (!$isTU)
+                                            {{-- AKSI --}}
+                                            <td>
 
-                                            @if($permission->status === 'pending')
+                                                @if($permission->status === 'pending')
 
-                                                <div class="d-flex gap-2 flex-wrap">
+                                                    <div class="d-flex gap-2 flex-wrap">
 
 
-                                                    {{-- APPROVE --}}
-                                                    <form
-                                                        action="{{ route('attendancePermission.approve', $permission->id) }}"
-                                                        method="POST"
-                                                    >
-
-                                                        @csrf
-
-                                                        <button
-                                                            type="submit"
-                                                            class="btn btn-success btn-sm"
-                                                            onclick="return confirm('Setujui izin ini?')"
+                                                        {{-- APPROVE --}}
+                                                        <form
+                                                            action="{{ route('attendancePermission.approve', $permission->id) }}"
+                                                            method="POST"
                                                         >
-                                                            ✔ Setujui
-                                                        </button>
 
-                                                    </form>
+                                                            @csrf
+
+                                                            <button
+                                                                type="submit"
+                                                                class="btn btn-success btn-sm"
+                                                                onclick="return confirm('Setujui izin ini?')"
+                                                            >
+                                                                ✔ Setujui
+                                                            </button>
+
+                                                        </form>
 
 
-                                                    {{-- REJECT --}}
-                                                    <form
-                                                        action="{{ route('attendancePermission.reject', $permission->id) }}"
-                                                        method="POST"
-                                                    >
-
-                                                        @csrf
-
-                                                        <button
-                                                            type="submit"
-                                                            class="btn btn-danger btn-sm"
-                                                            onclick="return confirm('Tolak izin ini?')"
+                                                        {{-- REJECT --}}
+                                                        <form
+                                                            action="{{ route('attendancePermission.reject', $permission->id) }}"
+                                                            method="POST"
                                                         >
-                                                            ✖ Tolak
-                                                        </button>
 
-                                                    </form>
+                                                            @csrf
 
-                                                </div>
+                                                            <button
+                                                                type="submit"
+                                                                class="btn btn-danger btn-sm"
+                                                                onclick="return confirm('Tolak izin ini?')"
+                                                            >
+                                                                ✖ Tolak
+                                                            </button>
 
-                                            @else
+                                                        </form>
 
-                                                <div class="small text-muted">
+                                                    </div>
 
-                                                    Sudah diproses
+                                                @else
 
-                                                    @if($permission->approvedBy)
+                                                    <div class="small text-muted">
 
-                                                        <br>
+                                                        Sudah diproses
 
-                                                        Oleh:
-                                                        <b>
-                                                            {{ $permission->approvedBy->name ?? '-' }}
-                                                        </b>
+                                                        @if($permission->approvedBy)
 
-                                                    @endif
+                                                            <br>
 
-                                                </div>
+                                                            Oleh:
+                                                            <b>
+                                                                {{ $permission->approvedBy->name ?? '-' }}
+                                                            </b>
 
-                                            @endif
+                                                        @endif
 
-                                        </td>
+                                                    </div>
+
+                                                @endif
+
+                                            </td>
+                                        @endif
 
                                     </tr>
 
@@ -391,7 +395,7 @@
                                     <tr>
 
                                         <td
-                                            colspan="10"
+                                            colspan="{{ $isTU ? 9 : 10 }}"
                                             class="text-center py-5 text-muted"
                                         >
 

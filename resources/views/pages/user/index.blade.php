@@ -921,7 +921,52 @@
                                 Administrator
                             </option>
 
+                            <option value="TU">
+                                TU
+                            </option>
+
                         </select>
+
+                    </div>
+
+                    {{-- UNIT KHUSUS TU --}}
+                    <div
+                        class="mb-3"
+                        id="addUnitWrapper"
+                        style="display:none;"
+                    >
+
+                        <label class="form-label fw-semibold">
+                            Unit
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <select
+                            name="unit_id"
+                            id="addUnit"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                -- Pilih Unit --
+                            </option>
+
+                            @foreach(\App\Models\Unit::orderBy('nama')->get() as $unit)
+
+                                <option
+                                    value="{{ $unit->id }}"
+                                    {{ old('unit_id') == $unit->id ? 'selected' : '' }}
+                                >
+                                    {{ $unit->nama }}
+                                </option>
+
+                            @endforeach
+
+                        </select>
+
+                        <div class="form-text">
+                            Unit yang dipilih menjadi batas akses akun TU.
+                        </div>
 
                     </div>
 
@@ -1066,6 +1111,94 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    const roleSelect =
+        document.getElementById('addUserRole');
+
+    const employeeWrapper =
+        document.getElementById('addEmployeeWrapper');
+
+    const employeeSelect =
+        document.getElementById('addEmployee');
+
+    const unitWrapper =
+        document.getElementById('addUnitWrapper');
+
+    const unitSelect =
+        document.getElementById('addUnit');
+
+
+    function updateAddUserForm() {
+
+        const role =
+            roleSelect.value;
+
+
+        // =================================================
+        // PIMPINAN
+        // =================================================
+        if (role === 'Pimpinan') {
+
+            employeeWrapper.style.display = '';
+
+            unitWrapper.style.display = 'none';
+
+            employeeSelect.required = true;
+
+            unitSelect.required = false;
+
+        }
+
+
+        // =================================================
+        // TU
+        // =================================================
+        else if (role === 'TU') {
+
+            employeeWrapper.style.display = 'none';
+
+            unitWrapper.style.display = '';
+
+            employeeSelect.required = false;
+
+            unitSelect.required = true;
+
+            // Jangan kirim employee
+            employeeSelect.value = '';
+
+        }
+
+
+        // =================================================
+        // ADMIN
+        // =================================================
+        else {
+
+            employeeWrapper.style.display = 'none';
+
+            unitWrapper.style.display = 'none';
+
+            employeeSelect.required = false;
+
+            unitSelect.required = false;
+
+            employeeSelect.value = '';
+
+            unitSelect.value = '';
+
+        }
+
+    }
+
+
+    roleSelect.addEventListener(
+        'change',
+        updateAddUserForm
+    );
+
+
+    // Jalankan saat modal/form pertama kali dibuka
+    updateAddUserForm();
 
     /*
     |--------------------------------------------------------------------------

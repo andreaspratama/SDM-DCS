@@ -18,6 +18,7 @@ use App\Services\EmployeeScheduleService;
 use App\Services\ApprovalResolverService;
 use App\Services\AttendanceFileImportService;
 use App\Services\WorkCalendarService;
+use App\Services\EmployeeUnitService;
 
 class AbsensiController extends Controller
 {
@@ -292,34 +293,74 @@ class AbsensiController extends Controller
             // =====================================================
             // SECURITY UNIT
             // =====================================================
+            $user =
+                auth()->user();
+
+
             $kepsekUnitId =
                 $this->getKepalaSekolahUnitId();
 
 
-            // =====================================================
-            // KEPALA SEKOLAH
-            //
-            // Request unit dari browser DIABAIKAN.
-            // Selalu paksa ke unit miliknya.
-            // =====================================================
-            if ($kepsekUnitId !== null) {
+            $isTU =
+                $user
+                && method_exists($user, 'isTU')
+                && $user->isTU();
 
-                $applyUnitPeriodFilter(
-                    $employeesQuery,
-                    $kepsekUnitId
+
+            $tuUnitId =
+                $isTU
+                    ? $user->unit_id
+                    : null;
+
+
+            // TU wajib mempunyai unit
+            if (
+                $isTU
+                &&
+                !$tuUnitId
+            ) {
+
+                abort(
+                    403,
+                    'Akun TU belum memiliki unit.'
                 );
-
             }
 
 
             // =====================================================
-            // ADMIN / DIREKTUR / ROLE LAIN
+            // UNIT TERKUNCI
+            //
+            // TU             = users.unit_id
+            // Kepala Sekolah = unit kepala sekolah
+            // Admin/Direktur = tidak dikunci
             // =====================================================
-            elseif ($request->filled('unit_id')) {
+            $lockedUnitId =
+                $isTU
+                    ? (int) $tuUnitId
+                    : (
+                        $kepsekUnitId !== null
+                            ? (int) $kepsekUnitId
+                            : null
+                    );
 
+
+            // =====================================================
+            // FILTER EMPLOYEE
+            // =====================================================
+            if ($lockedUnitId !== null) {
+
+                // Request unit dari browser diabaikan
                 $applyUnitPeriodFilter(
                     $employeesQuery,
-                    $request->unit_id
+                    $lockedUnitId
+                );
+
+            } elseif ($request->filled('unit_id')) {
+
+                // Admin / Direktur mengikuti filter
+                $applyUnitPeriodFilter(
+                    $employeesQuery,
+                    (int) $request->unit_id
                 );
             }
 
@@ -464,14 +505,13 @@ class AbsensiController extends Controller
                     // FILTER UNIT PER TANGGAL
                     // =============================================
                     $filterUnitId =
-                        $kepsekUnitId !== null
-                            ? $kepsekUnitId
+                        $lockedUnitId !== null
+                            ? $lockedUnitId
                             : (
                                 $request->filled('unit_id')
                                     ? (int) $request->unit_id
                                     : null
                             );
-
 
                     if (
                         $filterUnitId !== null
@@ -1331,11 +1371,16 @@ class AbsensiController extends Controller
     {
         $this->abortIfKepalaBidang();
 
-        $kepsekUnitId =
-            $this->getKepalaSekolahUnitId();
 
         // =====================================================
-        // CEK APAKAH LOGIN SEBAGAI KEPALA SEKOLAH
+        // USER LOGIN
+        // =====================================================
+        $user =
+            auth()->user();
+
+
+        // =====================================================
+        // KEPALA SEKOLAH
         // =====================================================
         $kepsekUnitId =
             $this->getKepalaSekolahUnitId();
@@ -1346,21 +1391,70 @@ class AbsensiController extends Controller
 
 
         // =====================================================
+        // TU
+        // =====================================================
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
+
+
+        $tuUnitId =
+            $isTU
+                ? $user->unit_id
+                : null;
+
+
+        if (
+            $isTU
+            &&
+            !$tuUnitId
+        ) {
+
+            abort(
+                403,
+                'Akun TU belum memiliki unit.'
+            );
+        }
+
+
+        // =====================================================
+        // UNIT YANG DIKUNCI
+        //
+        // TU            = unit dari users.unit_id
+        // Kepala Sekolah = unit dari employee
+        // Admin/Direktur = tidak dikunci
+        // =====================================================
+        $lockedUnitId =
+            $isTU
+                ? $tuUnitId
+                : (
+                    $isKepsek
+                        ? $kepsekUnitId
+                        : null
+                );
+
+
+        $isUnitLocked =
+            $lockedUnitId !== null;
+
+
+        // =====================================================
         // DAFTAR UNIT
         // =====================================================
-        if ($isKepsek) {
+        if ($isUnitLocked) {
 
-            // Kepala Sekolah hanya menerima unit miliknya
-            $units = Unit::where(
+            $units =
+                Unit::where(
                     'id',
-                    $kepsekUnitId
+                    $lockedUnitId
                 )
                 ->get();
 
         } else {
 
-            // Admin / Direktur
-            $units = Unit::orderBy(
+            $units =
+                Unit::orderBy(
                     'nama'
                 )
                 ->get();
@@ -1368,17 +1462,24 @@ class AbsensiController extends Controller
 
 
         $lockedUnit =
-            $isKepsek
-            ? $units->first()
-            : null;
+            $isUnitLocked
+                ? $units->first()
+                : null;
 
 
         return view(
             'pages.absensi.index',
             compact(
                 'units',
+
                 'isKepsek',
                 'kepsekUnitId',
+
+                'isTU',
+                'tuUnitId',
+
+                'isUnitLocked',
+                'lockedUnitId',
                 'lockedUnit'
             )
         );
@@ -1401,17 +1502,57 @@ class AbsensiController extends Controller
         ])->findOrFail($employeeId);
 
         // =====================================================
-        // SECURITY KEPALA SEKOLAH
+        // SECURITY UNIT
+        // KEPALA SEKOLAH / TU
         // =====================================================
+        $user =
+            auth()->user();
+
+
         $kepsekUnitId =
             $this->getKepalaSekolahUnitId();
 
 
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
+
+
+        $tuUnitId =
+            $isTU
+                ? $user->unit_id
+                : null;
+
+
         if (
-            $kepsekUnitId !== null
+            $isTU
+            &&
+            !$tuUnitId
+        ) {
+
+            abort(
+                403,
+                'Akun TU belum memiliki unit.'
+            );
+        }
+
+
+        $lockedUnitId =
+            $isTU
+                ? (int) $tuUnitId
+                : (
+                    $kepsekUnitId !== null
+                        ? (int) $kepsekUnitId
+                        : null
+                );
+
+
+        if (
+            $lockedUnitId !== null
             &&
             (int) $employee->unit_id
-                !== (int) $kepsekUnitId
+                !== (int) $lockedUnitId
         ) {
 
             abort(
@@ -2601,8 +2742,56 @@ class AbsensiController extends Controller
 
     public function formUpload()
     {
-        $units = Unit::all();
-        return view('pages.absensi.form', compact('units'));
+        // =====================================================
+        // USER LOGIN
+        // =====================================================
+        $user =
+            auth()->user();
+
+
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
+
+
+        // =====================================================
+        // DAFTAR UNIT
+        //
+        // TU    = hanya unit miliknya
+        // Admin = semua unit
+        // =====================================================
+        if ($isTU) {
+
+            $units =
+                Unit::where(
+                    'id',
+                    $user->unit_id
+                )
+                ->get();
+
+        } else {
+
+            $units =
+                Unit::orderBy('nama')
+                    ->get();
+        }
+
+
+        $tuUnitId =
+            $isTU
+                ? $user->unit_id
+                : null;
+
+
+        return view(
+            'pages.absensi.form',
+            compact(
+                'units',
+                'isTU',
+                'tuUnitId'
+            )
+        );
     }
 
     public function uploadLog(
@@ -2611,6 +2800,41 @@ class AbsensiController extends Controller
         EmployeeScheduleService $scheduleService
     )
     {
+        // =====================================================
+        // USER LOGIN
+        // =====================================================
+        $user =
+            auth()->user();
+
+
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
+
+
+        // =====================================================
+        // KUNCI UNIT UNTUK TU
+        //
+        // Walaupun hidden input diubah lewat browser,
+        // server tetap memakai unit milik user TU.
+        // =====================================================
+        if ($isTU) {
+
+            if (!$user->unit_id) {
+
+                abort(
+                    403,
+                    'Akun TU belum memiliki unit.'
+                );
+            }
+
+
+            $request->merge([
+                'unit_id' => $user->unit_id,
+            ]);
+        }
+
         $request->validate([
             'unit_id' => [
                 'required',
@@ -2915,9 +3139,83 @@ class AbsensiController extends Controller
 
     public function process(
         EmployeeScheduleService $scheduleService,
-        WorkCalendarService $calendarService
+        WorkCalendarService $calendarService,
+        EmployeeUnitService $employeeUnitService
     )
     {
+        // =====================================================
+        // USER LOGIN
+        // =====================================================
+        $user =
+            auth()->user();
+
+
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
+
+
+        // =====================================================
+        // VALIDASI AKSES PROCESS DATA UNTUK TU
+        //
+        // TU yang boleh Process Data:
+        // UM / SH / GM
+        // =====================================================
+        $tuUnitId = null;
+
+
+        if ($isTU) {
+
+            if (!$user->unit_id) {
+
+                abort(
+                    403,
+                    'Akun TU belum memiliki unit.'
+                );
+            }
+
+
+            $tuUnit =
+                Unit::find(
+                    $user->unit_id
+                );
+
+
+            if (!$tuUnit) {
+
+                abort(
+                    403,
+                    'Unit TU tidak ditemukan.'
+                );
+            }
+
+
+            $bolehProcess =
+                in_array(
+                    $tuUnit->code,
+                    [
+                        'UM',
+                        'SHS',
+                        'PS Gama',
+                    ],
+                    true
+                );
+
+
+            if (!$bolehProcess) {
+
+                abort(
+                    403,
+                    'Unit Anda tidak menggunakan Process Data.'
+                );
+            }
+
+
+            $tuUnitId =
+                (int) $user->unit_id;
+        }
+
         // =====================================================
         // AMBIL SEMUA RAW LOG
         // =====================================================
@@ -2994,6 +3292,31 @@ class AbsensiController extends Controller
 
             if (!$employee) {
                 continue;
+            }
+
+            // =================================================
+            // TU HANYA BOLEH MEMPROSES UNITNYA SENDIRI
+            //
+            // Menggunakan histori unit berdasarkan tanggal,
+            // bukan hanya employees.unit_id saat ini.
+            // =================================================
+            if ($isTU) {
+
+                $unitIdPadaTanggal =
+                    $employeeUnitService
+                        ->getUnitId(
+                            $employee,
+                            $tanggal
+                        );
+
+
+                if (
+                    (int) $unitIdPadaTanggal
+                    !==
+                    (int) $tuUnitId
+                ) {
+                    continue;
+                }
             }
 
 
@@ -3853,27 +4176,70 @@ class AbsensiController extends Controller
         // =====================================================
         // SECURITY UNIT
         // =====================================================
+        $user =
+            auth()->user();
+
+
         $kepsekUnitId =
             $this->getKepalaSekolahUnitId();
 
 
-        // =====================================================
-        // KEPALA SEKOLAH
-        // Selalu pakai unit miliknya.
-        // Request dari URL diabaikan.
-        // =====================================================
-        if ($kepsekUnitId !== null) {
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
 
+
+        $tuUnitId =
+            $isTU
+                ? $user->unit_id
+                : null;
+
+
+        // TU wajib mempunyai unit
+        if (
+            $isTU
+            &&
+            !$tuUnitId
+        ) {
+
+            abort(
+                403,
+                'Akun TU belum memiliki unit.'
+            );
+        }
+
+
+        // =====================================================
+        // UNIT TERKUNCI
+        // =====================================================
+        $lockedUnitId =
+            $isTU
+                ? (int) $tuUnitId
+                : (
+                    $kepsekUnitId !== null
+                        ? (int) $kepsekUnitId
+                        : null
+                );
+
+
+        // =====================================================
+        // UNIT EXPORT
+        // =====================================================
+        if ($lockedUnitId !== null) {
+
+            // Kepsek / TU
+            // Request unit dari URL diabaikan
             $unitId =
-                $kepsekUnitId;
+                $lockedUnitId;
 
         } else {
 
-            // Admin / Direktur boleh memilih unit
+            // Admin / Direktur
             $unitId =
                 $request->filled('unit_id')
-                ? (int) $request->unit_id
-                : null;
+                    ? (int) $request->unit_id
+                    : null;
         }
 
 
@@ -3935,7 +4301,8 @@ class AbsensiController extends Controller
             new \App\Exports\AttendanceExport(
                 $startDate,
                 $endDate,
-                $unitId
+                $unitId,
+                auth()->user()?->name
             ),
             $namaFile
         );

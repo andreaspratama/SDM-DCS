@@ -15,7 +15,12 @@ class AttendancePermissionApprovalController extends Controller
         $user = auth()->user();
 
         abort_unless(
-            $user && ($user->isAdmin() || $user->isPimpinan()),
+            $user
+            && (
+                $user->isAdmin()
+                || $user->isPimpinan()
+                || $user->isTU()
+            ),
             403
         );
 
@@ -32,8 +37,35 @@ class AttendancePermissionApprovalController extends Controller
         // =================================================
         if ($user->isAdmin()) {
 
-            // tidak perlu filter
+            // Admin melihat semua pengajuan
 
+        }
+
+        // =================================================
+        // TU
+        // Hanya pengajuan pegawai dari unit TU
+        // =================================================
+        elseif ($user->isTU()) {
+
+            if (!$user->unit_id) {
+
+                abort(
+                    403,
+                    'Akun TU belum memiliki unit.'
+                );
+            }
+
+
+            $query->whereHas(
+                'employee',
+                function ($employee) use ($user) {
+
+                    $employee->where(
+                        'unit_id',
+                        $user->unit_id
+                    );
+                }
+            );
         }
 
         // =================================================
@@ -63,9 +95,16 @@ class AttendancePermissionApprovalController extends Controller
             ->get();
 
 
+        $isTU =
+            $user->isTU();
+
+
         return view(
             'pages.absensi.permission-approval',
-            compact('permissions')
+            compact(
+                'permissions',
+                'isTU'
+            )
         );
     }
 

@@ -100,7 +100,22 @@ class UserManagementController extends Controller
                 Rule::in([
                     'Admin',
                     'Pimpinan',
+                    'TU',
                 ]),
+            ],
+
+            'unit_id' => [
+                Rule::requiredIf(
+                    fn () =>
+                        $request->role === 'TU'
+                ),
+
+                'nullable',
+
+                Rule::exists(
+                    'units',
+                    'id'
+                ),
             ],
 
             'employee_id' => [
@@ -203,13 +218,13 @@ class UserManagementController extends Controller
 
             'role' => $validated['role'],
 
-            /*
-             * Unit tidak dipilih manual.
-             * Sistem mengambil unit dari Employee.
-             */
-            'unit_id' => $employee?->unit_id,
+            'unit_id' =>
+                $validated['role'] === 'TU'
+                    ? $validated['unit_id']
+                    : $employee?->unit_id,
 
-            'employee_id' => $employee?->id,
+            'employee_id' =>
+                $employee?->id,
         ]);
 
 

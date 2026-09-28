@@ -191,31 +191,56 @@
                                   Unit
                               </label>
 
-                              <select
-                                  name="unit_id"
-                                  id="unit_id"
-                                  required
-                                  class="form-select @error('unit_id') is-invalid @enderror"
-                              >
+                            @if($isTU)
 
-                                  <option value="">
-                                      -- Pilih Unit --
-                                  </option>
+                                @php
+                                    $tuUnit = $units->first();
+                                @endphp
 
-                                  @foreach($units as $unit)
+                                <input
+                                    type="hidden"
+                                    name="unit_id"
+                                    id="unit_id"
+                                    value="{{ $tuUnitId }}"
+                                >
 
-                                      <option
-                                          value="{{ $unit->id }}"
-                                          @selected(
-                                              old('unit_id') == $unit->id
-                                          )
-                                      >
-                                          {{ $unit->nama }}
-                                      </option>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    value="{{ $tuUnit?->nama ?? '-' }}"
+                                    readonly
+                                >
 
-                                  @endforeach
+                            @else
 
-                              </select>
+                                <select
+                                    name="unit_id"
+                                    id="unit_id"
+                                    class="form-select"
+                                    required
+                                >
+
+                                    <option value="">
+                                        -- Pilih Unit --
+                                    </option>
+
+                                    @foreach($units as $unit)
+
+                                        <option
+                                            value="{{ $unit->id }}"
+                                            @selected(
+                                                old('unit_id')
+                                                == $unit->id
+                                            )
+                                        >
+                                            {{ $unit->nama }}
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            @endif
 
                               @error('unit_id')
                                   <div class="invalid-feedback">
@@ -275,28 +300,43 @@
                       <hr>
 
 
-                      {{-- =========================
-                          PROCESS RAW SCAN
-                      ========================== --}}
-                      <a
-                          href="{{ route('absensi.process') }}"
-                          class="btn btn-success"
-                      >
-                          <i class="fa-solid fa-arrows-rotate me-1"></i>
-                          Process Data
-                      </a>
+                        {{-- =========================
+                            PROCESS RAW SCAN
+
+                            Admin : selalu tampil
+                            TU    : hanya UM / SH / GM
+                        ========================== --}}
+                        @php
+                            $showProcessData =
+                                !$isTU
+                                ||
+                                (
+                                    isset($tuUnit)
+                                    &&
+                                    in_array(
+                                        $tuUnit->code,
+                                        [
+                                            'UM',
+                                            'SHS',
+                                            'PS Gama',
+                                        ],
+                                        true
+                                    )
+                                );
+                        @endphp
 
 
-                      {{-- =========================
-                          GENERATE ALPHA
-                      ========================== --}}
-                      <a
-                          href="{{ route('absensi.alpha') }}"
-                          class="btn btn-danger"
-                      >
-                          <i class="fa-solid fa-user-xmark me-1"></i>
-                          Generate Alpha
-                      </a>
+                        @if($showProcessData)
+
+                            <a
+                                href="{{ route('absensi.process') }}"
+                                class="btn btn-success"
+                            >
+                                <i class="fa-solid fa-arrows-rotate me-1"></i>
+                                Process Data
+                            </a>
+
+                        @endif
 
                   </div>
                 </div>

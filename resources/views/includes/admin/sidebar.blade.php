@@ -7,6 +7,10 @@
         && method_exists($user, 'isAdmin')
         && $user->isAdmin();
 
+    $isTU =
+        $user
+        && method_exists($user, 'isTU')
+        && $user->isTU();
 
     /*
     |--------------------------------------------------------------------------
@@ -159,7 +163,7 @@
                             REKAP ABSENSI
                             Kepala Bidang tidak ditampilkan
                         ===================================================== --}}
-                        @if($loginEmployeeRole !== 'Kepala Bidang')
+                        @if($isTU || $loginEmployeeRole !== 'Kepala Bidang')
 
                             <li class="nav-item">
 
@@ -191,7 +195,7 @@
 
 
                         {{-- UPLOAD ABSENSI --}}
-                        @if($isAdmin)
+                        @if($isAdmin || $isTU)
 
                             <li class="nav-item">
 

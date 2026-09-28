@@ -18,6 +18,8 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
 
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -29,17 +31,20 @@ class AttendanceExport implements
     WithHeadings,
     ShouldAutoSize,
     WithStyles,
-    WithColumnWidths
+    WithColumnWidths,
+    WithEvents
 {
     protected $startDate;
     protected $endDate;
     protected $unitId;
+    protected $downloadedBy;
 
 
     public function __construct(
         $startDate,
         $endDate,
-        $unitId = null
+        $unitId = null,
+        $downloadedBy = null
     ) {
         $this->startDate =
             Carbon::parse(
@@ -53,6 +58,9 @@ class AttendanceExport implements
 
         $this->unitId =
             $unitId;
+
+        $this->downloadedBy =
+            $downloadedBy;
     }
 
 
@@ -243,6 +251,8 @@ class AttendanceExport implements
                 'pulang_cepat' => 0,
 
                 'total_menit_pulang_cepat' => 0,
+
+                'total_menit_keluar_tanpa_izin' => 0,
 
                 'total_menit' => 0,
             ];
@@ -750,113 +760,186 @@ class AttendanceExport implements
 
 
                     // =================================================
-                    // ACTIVITIES
-                    // =================================================
-                    $activities =
-                        $att->activities
-                            ->sortBy('time')
-                            ->values();
+// ACTIVITIES
+// =================================================
+$activities =
+    $att->activities
+        ->sortBy('time')
+        ->values();
 
 
-                    // =================================================
-                    // TOTAL JAM KERJA AKTUAL
-                    //
-                    // Check In -> Check Out
-                    // dikurangi seluruh OUT -> IN
-                    // =================================================
-                    if (
-                        $masukFix
-                        &&
-                        $pulangFix
-                        &&
-                        $pulangFix->gt(
-                            $masukFix
-                        )
-                    ) {
-
-                        $totalMenit =
-                            (int) $masukFix
-                                ->diffInMinutes(
-                                    $pulangFix
-                                );
+// =================================================
+// HITUNG SEMUA OUT -> IN
+//
+// Tidak bergantung pada check_out.
+// Jadi walaupun Pulang = null,
+// aktivitas OUT -> IN tetap dihitung.
+// =================================================
+$totalMenitKeluar = 0;
 
 
-                        $totalMenitKeluar =
-                            0;
+for (
+    $i = 0;
+    $i < $activities->count() - 1;
+    $i++
+) {
+
+    $current =
+        $activities[$i];
+
+    $next =
+        $activities[$i + 1];
 
 
-                        for (
-                            $i = 0;
-                            $i <
-                                $activities->count() - 1;
-                            $i++
-                        ) {
-
-                            $current =
-                                $activities[$i];
-
-                            $next =
-                                $activities[$i + 1];
+    // =========================================
+    // HANYA PASANGAN OUT -> IN
+    // =========================================
+    if (
+        $current->type !== 'out'
+        ||
+        $next->type !== 'in'
+    ) {
+        continue;
+    }
 
 
-                            // Hanya OUT -> IN
-                            if (
-                                $current->type
-                                    !== 'out'
-                                ||
-                                $next->type
-                                    !== 'in'
-                            ) {
-                                continue;
-                            }
+    $jamKeluar =
+        Carbon::parse(
+            $tanggal
+            . ' '
+            . $current->time
+        );
 
 
-                            $keluar =
-                                Carbon::parse(
-                                    $tanggal
-                                    . ' '
-                                    . $current->time
-                                );
+    $jamKembali =
+        Carbon::parse(
+            $tanggal
+            . ' '
+            . $next->time
+        );
 
 
-                            $kembali =
-                                Carbon::parse(
-                                    $tanggal
-                                    . ' '
-                                    . $next->time
-                                );
+    if (
+        !$jamKembali->gt(
+            $jamKeluar
+        )
+    ) {
+        continue;
+    }
 
 
-                            if (
-                                $kembali->gt(
-                                    $keluar
-                                )
-                            ) {
-
-                                $totalMenitKeluar +=
-                                    (int)
-                                    $keluar
-                                        ->diffInMinutes(
-                                            $kembali
-                                        );
-                            }
-                        }
+    // =========================================
+    // DURASI OUT -> IN
+    // =========================================
+    $durasiKeluar =
+        (int) $jamKeluar
+            ->diffInMinutes(
+                $jamKembali
+            );
 
 
-                        $menitKerjaAktual =
-                            max(
-                                0,
-                                $totalMenit
-                                -
-                                $totalMenitKeluar
-                            );
+    $totalMenitKeluar +=
+        $durasiKeluar;
 
 
-                        $summary[
-                            'total_menit'
-                        ] +=
-                            $menitKerjaAktual;
-                    }
+    // =========================================
+    // CEK IZIN APPROVED
+    // =========================================
+    $adaIzin =
+        $izinHari->contains(
+            function ($permission) use (
+                $tanggal,
+                $jamKeluar,
+                $jamKembali
+            ) {
+
+                if (
+                    !$permission->time_start
+                    ||
+                    !$permission->time_end
+                ) {
+                    return false;
+                }
+
+
+                $izinMulai =
+                    Carbon::parse(
+                        $tanggal
+                        . ' '
+                        . $permission->time_start
+                    );
+
+
+                $izinSelesai =
+                    Carbon::parse(
+                        $tanggal
+                        . ' '
+                        . $permission->time_end
+                    );
+
+
+                return
+                    $izinMulai->lte(
+                        $jamKeluar
+                    )
+                    &&
+                    $izinSelesai->gte(
+                        $jamKembali
+                    );
+            }
+        );
+
+
+    // =========================================
+    // PERGI TANPA IZIN
+    // =========================================
+    if (!$adaIzin) {
+
+        $summary[
+            'total_menit_keluar_tanpa_izin'
+        ] +=
+            $durasiKeluar;
+    }
+}
+
+
+// =================================================
+// TOTAL JAM KERJA AKTUAL
+//
+// Bagian ini tetap membutuhkan
+// check-in dan check-out.
+// =================================================
+if (
+    $masukFix
+    &&
+    $pulangFix
+    &&
+    $pulangFix->gt(
+        $masukFix
+    )
+) {
+
+    $totalMenit =
+        (int) $masukFix
+            ->diffInMinutes(
+                $pulangFix
+            );
+
+
+    $menitKerjaAktual =
+        max(
+            0,
+            $totalMenit
+            -
+            $totalMenitKeluar
+        );
+
+
+    $summary[
+        'total_menit'
+    ] +=
+        $menitKerjaAktual;
+}
 
                 } else {
 
@@ -898,10 +981,7 @@ class AttendanceExport implements
                 ) {
 
                     $parts[] =
-                        $jenis
-                        . ' ('
-                        . $jumlah
-                        . ')';
+                        $jenis;
                 }
 
 
@@ -961,12 +1041,9 @@ class AttendanceExport implements
                 ],
 
                 // K
-                round(
-                    $summary[
-                        'total_menit'
-                    ] / 60,
-                    1
-                ),
+                $summary[
+                    'total_menit_keluar_tanpa_izin'
+                ],
             ];
         }
 
@@ -1004,7 +1081,7 @@ class AttendanceExport implements
 
             'Durasi Pulang Cepat (Menit)',
 
-            'Total Jam Kerja',
+            'Menit Pergi Tanpa Izin',
         ];
     }
 
@@ -1137,14 +1214,14 @@ class AttendanceExport implements
                 ->setWrapText(true);
 
 
-            // Total jam
+            // Menit pergi tanpa izin
             $sheet
                 ->getStyle(
                     'K2:K' . $lastRow
                 )
                 ->getNumberFormat()
                 ->setFormatCode(
-                    '0.0'
+                    '0'
                 );
         }
 
@@ -1178,6 +1255,127 @@ class AttendanceExport implements
                 ],
 
             ],
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+
+                $sheet =
+                    $event->sheet
+                        ->getDelegate();
+
+
+                // =============================================
+                // BARIS TERAKHIR DATA
+                // =============================================
+                $lastRow =
+                    $sheet->getHighestRow();
+
+
+                // Beri jarak dari tabel
+                $tanggalRow =
+                    $lastRow + 3;
+
+
+                // Beri ruang untuk tanda tangan
+                $namaRow =
+                    $tanggalRow + 4;
+
+                // =============================================
+                // MERGE RUANG TANDA TANGAN
+                // Supaya tidak ada garis vertikal di tengah
+                // =============================================
+                for (
+                    $row = $tanggalRow + 1;
+                    $row < $namaRow;
+                    $row++
+                ) {
+                    $sheet->mergeCells(
+                        "I{$row}:K{$row}"
+                    );
+                }
+
+                // =============================================
+                // HILANGKAN GRIDLINE DI AREA TANDA TANGAN
+                // =============================================
+                $sheet
+                    ->getStyle(
+                        "I{$tanggalRow}:K{$namaRow}"
+                    )
+                    ->getFill()
+                    ->setFillType(
+                        Fill::FILL_SOLID
+                    )
+                    ->getStartColor()
+                    ->setARGB(
+                        'FFFFFFFF'
+                    );
+
+
+                // =============================================
+                // TANGGAL DOWNLOAD
+                // =============================================
+                $tanggalDownload =
+                    Carbon::now('Asia/Jakarta')
+                        ->locale('id')
+                        ->translatedFormat(
+                            'd F Y'
+                        );
+
+
+                // =============================================
+                // TANGGAL
+                // =============================================
+                $sheet->mergeCells(
+                    "I{$tanggalRow}:K{$tanggalRow}"
+                );
+
+                $sheet->setCellValue(
+                    "I{$tanggalRow}",
+                    'Semarang, ' .
+                    $tanggalDownload
+                );
+
+
+                // =============================================
+                // NAMA YANG DOWNLOAD
+                // =============================================
+                $sheet->mergeCells(
+                    "I{$namaRow}:K{$namaRow}"
+                );
+
+                $sheet->setCellValue(
+                    "I{$namaRow}",
+                    $this->downloadedBy
+                        ?: '-'
+                );
+
+
+                // =============================================
+                // ALIGNMENT
+                // =============================================
+                $sheet
+                    ->getStyle(
+                        "I{$tanggalRow}:K{$namaRow}"
+                    )
+                    ->getAlignment()
+                    ->setHorizontal(
+                        Alignment::HORIZONTAL_CENTER
+                    );
+
+
+                // Nama dibuat bold + underline
+                $sheet
+                    ->getStyle(
+                        "I{$namaRow}:K{$namaRow}"
+                    )
+                    ->getFont()
+                    ->setBold(true)
+                    ->setUnderline(true);
+            },
         ];
     }
 }

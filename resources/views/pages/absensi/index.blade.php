@@ -57,35 +57,31 @@
 
 
                                     {{-- =================================================
-                                        KEPALA SEKOLAH
-                                        Unit dikunci sesuai akun login
-                                    ================================================= --}}
-                                    @if($isKepsek)
+                                    UNIT TERKUNCI
+                                    Kepala Sekolah / TU
+                                ================================================= --}}
+                                @if($isUnitLocked)
 
-                                        {{-- Value ini tetap dibaca DataTable --}}
-                                        <input
-                                            type="hidden"
-                                            id="unit_id"
-                                            value="{{ $kepsekUnitId }}"
-                                        >
+                                    {{-- Value ini tetap dibaca DataTable --}}
+                                    <input
+                                        type="hidden"
+                                        id="unit_id"
+                                        value="{{ $lockedUnitId }}"
+                                    >
 
-                                        {{-- Hanya untuk tampilan --}}
-                                        <div
-                                            class="form-control bg-light d-flex align-items-center"
-                                            style="
-                                                min-height:38px;
-                                                cursor:not-allowed;
-                                                font-weight:600;
-                                            "
-                                        >
-                                            <i class="fa-solid fa-lock me-2 text-secondary"></i>
+                                    {{-- Hanya untuk tampilan --}}
+                                    <div
+                                        class="form-control bg-light d-flex align-items-center"
+                                        style="
+                                            min-height:38px;
+                                            cursor:not-allowed;
+                                            font-weight:600;
+                                        "
+                                    >
+                                        <i class="fa-solid fa-lock me-2 text-secondary"></i>
 
-                                            {{ $lockedUnit?->nama ?? 'Unit tidak ditemukan' }}
-                                        </div>
-
-                                        {{-- <div class="form-text">
-                                            Unit otomatis sesuai akun Kepala Sekolah.
-                                        </div> --}}
+                                        {{ $lockedUnit?->nama ?? 'Unit tidak ditemukan' }}
+                                    </div>
 
 
                                     {{-- =================================================
@@ -227,8 +223,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
     <script>
       $(document).ready(function(){
-          const isKepsek = @json($isKepsek);
-          const kepsekUnitId = @json($kepsekUnitId);
+          const isUnitLocked = @json($isUnitLocked);
+          const lockedUnitId = @json($lockedUnitId);
 
           let today = new Date();
 
@@ -347,10 +343,10 @@
                 // =====================================================
                 // RESET UNIT
                 // =====================================================
-                if (isKepsek) {
+                if (isUnitLocked) {
 
-                    // Kepala Sekolah tetap terkunci ke unitnya
-                    $('#unit_id').val(kepsekUnitId);
+                    // Kepala Sekolah / TU tetap terkunci ke unitnya
+                    $('#unit_id').val(lockedUnitId);
 
                 } else {
 
@@ -403,9 +399,9 @@
                 // =====================================================
                 // UNIT
                 // =====================================================
-                if (isKepsek) {
+                if (isUnitLocked) {
 
-                    unit = kepsekUnitId;
+                    unit = lockedUnitId;
 
                 } else {
 

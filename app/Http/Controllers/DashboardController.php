@@ -44,22 +44,52 @@ class DashboardController extends Controller
         $isKabid =
             $employeeRole === 'Kepala Bidang';
 
+        $isTU =
+            $user
+            && method_exists($user, 'isTU')
+            && $user->isTU();
+
 
         // =====================================================
         // SCOPE UNIT
         //
-        // Kepala Sekolah hanya melihat unit sendiri.
-        // Admin / Direktur = semua unit.
+        // Kepala Sekolah = unit employee
+        // TU              = unit user
+        // Admin/Direktur  = semua unit
         // =====================================================
-        $scopeUnitId =
-            $isKepsek
-                ? $loginEmployee?->unit_id
-                : null;
+        if ($isTU) {
+
+            // TU wajib dibatasi ke unit akun login
+            abort_unless(
+                $user->unit_id,
+                403,
+                'Akun TU belum memiliki unit.'
+            );
+
+            $scopeUnitId =
+                $user->unit_id;
+
+        } elseif ($isKepsek) {
+
+            $scopeUnitId =
+                $loginEmployee?->unit_id;
+
+        } else {
+
+            $scopeUnitId =
+                null;
+        }
 
 
+        // =====================================================
+        // NAMA SCOPE
+        // =====================================================
         $scopeName =
             $scopeUnitId
-                ? ($loginEmployee?->unit?->nama ?? 'Unit')
+                ? (
+                    Unit::find($scopeUnitId)?->nama
+                    ?? 'Unit'
+                )
                 : 'Semua Unit';
 
 
