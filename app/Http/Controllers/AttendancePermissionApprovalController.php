@@ -10,7 +10,7 @@ class AttendancePermissionApprovalController extends Controller
     // =====================================================
     // DAFTAR PENGAJUAN IZIN
     // =====================================================
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
 
@@ -32,19 +32,71 @@ class AttendancePermissionApprovalController extends Controller
         ]);
 
         // =================================================
-        // ADMIN
-        // Melihat semua pengajuan
+        // FILTER TANGGAL
         // =================================================
+
+        $dateFrom = $request->date_from;
+        $dateTo   = $request->date_to;
+
+        if ($dateFrom && $dateTo) {
+
+            $query->where(function ($q) use ($dateFrom, $dateTo) {
+
+                // Pengajuan yang tanggalnya bersinggungan
+                // dengan periode filter
+
+                $q->whereDate('date_start', '<=', $dateTo)
+                ->where(function ($q2) use ($dateFrom) {
+
+                    $q2->whereDate('date_end', '>=', $dateFrom)
+                        ->orWhere(function ($q3) use ($dateFrom) {
+
+                            $q3->whereNull('date_end')
+                                ->whereDate('date_start', '>=', $dateFrom);
+
+                        });
+
+                });
+
+            });
+
+        } elseif ($dateFrom) {
+
+            $query->where(function ($q) use ($dateFrom) {
+
+                $q->whereDate('date_end', '>=', $dateFrom)
+                ->orWhere(function ($q2) use ($dateFrom) {
+
+                    $q2->whereNull('date_end')
+                        ->whereDate('date_start', '>=', $dateFrom);
+
+                });
+
+            });
+
+        } elseif ($dateTo) {
+
+            $query->whereDate('date_start', '<=', $dateTo);
+
+        }
+
+
+        // =================================================
+        // ADMIN
+        // Semua pengajuan
+        // =================================================
+
         if ($user->isAdmin()) {
 
-            // Admin melihat semua pengajuan
+            // Semua pengajuan
 
         }
 
         // =================================================
         // TU
-        // Hanya pengajuan pegawai dari unit TU
+        // Hanya unit TU
         // =================================================
+
         elseif ($user->isTU()) {
 
             if (!$user->unit_id) {
@@ -55,7 +107,6 @@ class AttendancePermissionApprovalController extends Controller
                 );
             }
 
-
             $query->whereHas(
                 'employee',
                 function ($employee) use ($user) {
@@ -64,24 +115,31 @@ class AttendancePermissionApprovalController extends Controller
                         'unit_id',
                         $user->unit_id
                     );
+
                 }
             );
+
         }
 
         // =================================================
         // PIMPINAN
-        // Hanya pengajuan yang memang ditujukan kepadanya
+        // Hanya pengajuan yang ditujukan kepadanya
         // =================================================
+
         else {
 
             $query->where(
                 'approver_user_id',
                 $user->id
             );
+
         }
 
 
-        // Pending di atas
+        // =================================================
+        // SORTING
+        // =================================================
+
         $permissions = $query
             ->orderByRaw("
                 CASE
@@ -95,15 +153,16 @@ class AttendancePermissionApprovalController extends Controller
             ->get();
 
 
-        $isTU =
-            $user->isTU();
+        $isTU = $user->isTU();
 
 
         return view(
             'pages.absensi.permission-approval',
             compact(
                 'permissions',
-                'isTU'
+                'isTU',
+                'dateFrom',
+                'dateTo'
             )
         );
     }

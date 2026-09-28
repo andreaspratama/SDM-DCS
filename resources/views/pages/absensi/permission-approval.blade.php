@@ -47,6 +47,84 @@
 
 
                 <div class="card-body">
+                    {{-- FILTER TANGGAL --}}
+                    <div class="card border mb-4">
+
+                        <div class="card-body">
+
+                            <form
+                                method="GET"
+                                action="{{ route('attendancePermission.index') }}"
+                            >
+
+                                <div class="row g-3 align-items-end">
+
+                                    {{-- DARI --}}
+                                    <div class="col-md-4">
+
+                                        <label class="form-label fw-semibold">
+                                            Dari Tanggal
+                                        </label>
+
+                                        <input
+                                            type="date"
+                                            name="date_from"
+                                            class="form-control"
+                                            value="{{ $dateFrom ?? '' }}"
+                                        >
+
+                                    </div>
+
+
+                                    {{-- SAMPAI --}}
+                                    <div class="col-md-4">
+
+                                        <label class="form-label fw-semibold">
+                                            Sampai Tanggal
+                                        </label>
+
+                                        <input
+                                            type="date"
+                                            name="date_to"
+                                            class="form-control"
+                                            value="{{ $dateTo ?? '' }}"
+                                        >
+
+                                    </div>
+
+
+                                    {{-- BUTTON --}}
+                                    <div class="col-md-4">
+
+                                        <div class="d-flex gap-2">
+
+                                            <button
+                                                type="submit"
+                                                class="btn btn-primary"
+                                            >
+                                                <i class="fa-solid fa-filter me-1"></i>
+                                                Filter
+                                            </button>
+
+                                            <a
+                                                href="{{ route('attendancePermission.index') }}"
+                                                class="btn btn-outline-secondary"
+                                            >
+                                                <i class="fa-solid fa-rotate-left me-1"></i>
+                                                Reset
+                                            </a>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </form>
+
+                        </div>
+
+                    </div>
 
                     <div class="table-responsive">
 
