@@ -460,6 +460,9 @@
                         name="date_end"
                         id="date_end"
                         value="{{ old('date_end') }}"
+                        min="{{ now()->gte(\Carbon\Carbon::create(2026, 11, 1))
+                            ? now()->startOfMonth()->toDateString()
+                            : '' }}"
                         class="
                             w-full
                             mt-2
@@ -705,6 +708,76 @@
 document.addEventListener(
     'DOMContentLoaded',
     function () {
+
+        // =================================================
+        // BATAS TANGGAL IZIN
+        // Mulai November 2026:
+        // tidak boleh memilih bulan sebelum bulan berjalan.
+        //
+        // Contoh:
+        // 10 Nov 2026 -> minimal 01 Nov 2026
+        // 10 Des 2026 -> minimal 01 Des 2026
+        //
+        // September & Oktober 2026 tetap bebas.
+        // =================================================
+
+        const today =
+            new Date();
+
+        const batasMulai =
+            new Date(
+                2026,
+                10,
+                1
+            ); // 1 November 2026
+
+        const dateStartInput =
+            document.getElementById(
+                'date_start'
+            );
+
+        const dateEndInput =
+            document.getElementById(
+                'date_end'
+            );
+
+
+        if (
+            today >= batasMulai
+        ) {
+
+            const minDate =
+                new Date(
+                    today.getFullYear(),
+                    today.getMonth(),
+                    1
+                );
+
+            const year =
+                minDate.getFullYear();
+
+            const month =
+                String(
+                    minDate.getMonth() + 1
+                ).padStart(
+                    2,
+                    '0'
+                );
+
+            const minDateString =
+                `${year}-${month}-01`;
+
+
+            dateStartInput.setAttribute(
+                'min',
+                minDateString
+            );
+
+            dateEndInput.setAttribute(
+                'min',
+                minDateString
+            );
+        }
 
         const type =
             document.getElementById('type');

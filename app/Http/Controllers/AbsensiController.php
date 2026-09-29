@@ -3956,6 +3956,91 @@ class AbsensiController extends Controller
             ]
         );
 
+        // =====================================================
+        // BATAS TANGGAL IZIN
+        //
+        // Mulai November 2026:
+        // tidak boleh mengajukan izin untuk bulan sebelumnya.
+        //
+        // Contoh:
+        // 10 November 2026 -> minimal 1 November 2026
+        // 10 Desember 2026 -> minimal 1 Desember 2026
+        //
+        // September & Oktober 2026 tetap tidak dibatasi.
+        // =====================================================
+
+        $today =
+            \Carbon\Carbon::today();
+
+        $permissionRestrictionStart =
+            \Carbon\Carbon::create(
+                2026,
+                11,
+                1
+            );
+
+
+        if (
+            $today->greaterThanOrEqualTo(
+                $permissionRestrictionStart
+            )
+        ) {
+
+            $minimumDate =
+                $today->copy()->startOfMonth();
+
+
+            $dateStart =
+                \Carbon\Carbon::parse(
+                    $validated['date_start']
+                );
+
+
+            if (
+                $dateStart->lt(
+                    $minimumDate
+                )
+            ) {
+
+                return back()
+                    ->withErrors([
+                        'date_start' =>
+                            'Mulai November 2026, pengajuan izin tidak dapat dilakukan untuk bulan sebelumnya. Silakan pilih tanggal pada bulan berjalan atau bulan setelahnya.',
+                    ])
+                    ->withInput();
+            }
+
+
+            // Untuk izin beberapa hari,
+            // tanggal selesai juga tidak boleh mundur
+            // melewati bulan berjalan.
+            if (
+                !$isPartialPermission
+                &&
+                !empty($validated['date_end'])
+            ) {
+
+                $dateEnd =
+                    \Carbon\Carbon::parse(
+                        $validated['date_end']
+                    );
+
+
+                if (
+                    $dateEnd->lt(
+                        $minimumDate
+                    )
+                ) {
+
+                    return back()
+                        ->withErrors([
+                            'date_end' =>
+                                'Tanggal selesai tidak boleh berada pada bulan sebelum bulan berjalan.',
+                        ])
+                        ->withInput();
+                }
+            }
+        }
 
         // =====================================================
         // CEK EMPLOYEE SESUAI UNIT TOKEN
