@@ -52,6 +52,23 @@ class AttendanceFileImportService
         EmployeeScheduleService $scheduleService
     ): array {
 
+        // =====================================================
+        // TK GAMA / GM
+        // Format khusus:
+        // - C3 = periode tanggal
+        // - baris 4 = nomor tanggal
+        // - setiap pegawai = 2 baris
+        // - jam scan berada di A:O
+        // =====================================================
+
+        if ($this->isTkGamaFormat($file)) {
+
+            return $this->importTkGama(
+                $file,
+                $unitId
+            );
+        }
+
         $this->resetState();
 
         $this->unitId = $unitId;
@@ -2037,5 +2054,498 @@ class AttendanceFileImportService
                 );
             }
         }
+    }
+
+    // =====================================================
+    // DETEKSI FORMAT TK GAMA
+    // =====================================================
+    private function isTkGamaFormat($file): bool
+    {
+        try {
+
+            $spreadsheet =
+                \PhpOffice\PhpSpreadsheet\IOFactory::load(
+                    $file->getRealPath()
+                );
+
+            $sheet =
+                $spreadsheet->getActiveSheet();
+
+
+            $judul =
+                trim(
+                    (string) $sheet
+                        ->getCell('A1')
+                        ->getValue()
+                );
+
+
+            $labelTanggal =
+                trim(
+                    (string) $sheet
+                        ->getCell('A3')
+                        ->getValue()
+                );
+
+
+            $periode =
+                trim(
+                    (string) $sheet
+                        ->getCell('C3')
+                        ->getValue()
+                );
+
+
+            // =================================================
+            // VALIDASI STRUKTUR TK GAMA
+            // =================================================
+            if (
+                stripos(
+                    $judul,
+                    'Lap. Detail Absensi'
+                ) === false
+            ) {
+                return false;
+            }
+
+
+            if (
+                strcasecmp(
+                    $labelTanggal,
+                    'Waktu Absen'
+                ) !== 0
+            ) {
+                return false;
+            }
+
+
+            if (
+                !preg_match(
+                    '/^\d{4}-\d{2}-\d{2}\s*~\s*\d{4}-\d{2}-\d{2}$/',
+                    $periode
+                )
+            ) {
+                return false;
+            }
+
+
+            // Baris 4 harus berisi nomor tanggal
+            for (
+                $column = 1;
+                $column <= 15;
+                $column++
+            ) {
+
+                $value =
+                    $sheet
+                        ->getCellByColumnAndRow(
+                            $column,
+                            4
+                        )
+                        ->getValue();
+
+                if (
+                    (int) $value !== $column
+                ) {
+                    return false;
+                }
+            }
+
+
+            return true;
+
+        } catch (\Throwable $e) {
+
+            return false;
+        }
+    }
+
+
+    // =====================================================
+    // IMPORT FORMAT TK GAMA
+    // =====================================================
+    private function importTkGama(
+        $file,
+        int $unitId
+    ): array {
+
+        $spreadsheet =
+            \PhpOffice\PhpSpreadsheet\IOFactory::load(
+                $file->getRealPath()
+            );
+
+        $sheet =
+            $spreadsheet->getActiveSheet();
+
+
+        // =================================================
+        // PERIODE
+        // =================================================
+        $periode =
+            trim(
+                (string) $sheet
+                    ->getCell('C3')
+                    ->getValue()
+            );
+
+
+        if (
+            !preg_match(
+                '/^(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})$/',
+                $periode,
+                $matches
+            )
+        ) {
+
+            throw new \RuntimeException(
+                'Periode tanggal TK Gama tidak dapat dibaca.'
+            );
+        }
+
+
+        $startDate =
+            \Carbon\Carbon::parse(
+                $matches[1]
+            )->startOfDay();
+
+
+        $endDate =
+            \Carbon\Carbon::parse(
+                $matches[2]
+            )->startOfDay();
+
+
+        // =================================================
+        // HASIL
+        // =================================================
+        $insertedLogs = 0;
+
+        $duplicates = 0;
+
+        $skipped = 0;
+
+        $missingUids = [];
+
+
+        // =================================================
+        // POLA JAM
+        //
+        // Contoh:
+        // 06:2715:0415:06
+        //
+        // menjadi:
+        // 06:27
+        // 15:04
+        // 15:06
+        // =================================================
+        $timePattern =
+            '/\d{1,2}:\d{2}/';
+
+
+        $maxRow =
+            $sheet->getHighestRow();
+
+
+        // =================================================
+        // LOOP PEGAWAI
+        //
+        // Baris:
+        // 5 = ID
+        // 6 = scan
+        //
+        // 7 = ID
+        // 8 = scan
+        // dst.
+        // =================================================
+        for (
+            $row = 5;
+            $row <= $maxRow;
+            $row++
+        ) {
+
+            $idLabel =
+                trim(
+                    (string) $sheet
+                        ->getCellByColumnAndRow(
+                            1,
+                            $row
+                        )
+                        ->getValue()
+                );
+
+
+            if (
+                strtoupper($idLabel) !== 'ID:'
+            ) {
+                continue;
+            }
+
+
+            // =================================================
+            // UID
+            // =================================================
+            $uid =
+                trim(
+                    (string) $sheet
+                        ->getCellByColumnAndRow(
+                            3,
+                            $row
+                        )
+                        ->getValue()
+                );
+
+
+            if ($uid === '') {
+
+                $skipped++;
+
+                continue;
+            }
+
+
+            // =================================================
+            // NORMALISASI UID
+            //
+            // Supaya:
+            // 00017
+            // 17
+            //
+            // tetap bisa dicocokkan.
+            // =================================================
+            $normalizedUid =
+                ltrim(
+                    $uid,
+                    '0'
+                );
+
+            if ($normalizedUid === '') {
+                $normalizedUid = '0';
+            }
+
+
+            // =================================================
+            // CARI EMPLOYEE SESUAI UNIT
+            // =================================================
+            $employee =
+                \App\Models\Employee::where(
+                    'unit_id',
+                    $unitId
+                )
+                ->whereRaw(
+                    "TRIM(LEADING '0' FROM uid) = ?",
+                    [
+                        $normalizedUid
+                    ]
+                )
+                ->first();
+
+
+            if (!$employee) {
+
+                if (
+                    !in_array(
+                        $uid,
+                        $missingUids,
+                        true
+                    )
+                ) {
+
+                    $missingUids[] =
+                        $uid;
+                }
+
+                continue;
+            }
+
+
+            // =================================================
+            // BARIS SCAN
+            // =================================================
+            $scanRow =
+                $row + 1;
+
+
+            if (
+                $scanRow > $maxRow
+            ) {
+                continue;
+            }
+
+
+            // =================================================
+            // 15 KOLOM TANGGAL
+            // A:O
+            // =================================================
+            for (
+                $column = 1;
+                $column <= 15;
+                $column++
+            ) {
+
+                $rawValue =
+                    $sheet
+                        ->getCellByColumnAndRow(
+                            $column,
+                            $scanRow
+                        )
+                        ->getValue();
+
+
+                if (
+                    $rawValue === null
+                    ||
+                    trim((string) $rawValue) === ''
+                ) {
+                    continue;
+                }
+
+
+                // =================================================
+                // TANGGAL
+                //
+                // Kolom pertama = start date
+                // Kolom kedua = +1 hari
+                // dst.
+                // =================================================
+                $tanggal =
+                    $startDate
+                        ->copy()
+                        ->addDays(
+                            $column - 1
+                        );
+
+
+                // Jangan melewati end date
+                if (
+                    $tanggal->gt(
+                        $endDate
+                    )
+                ) {
+                    continue;
+                }
+
+
+                // =================================================
+                // AMBIL SEMUA JAM
+                // =================================================
+                preg_match_all(
+                    $timePattern,
+                    (string) $rawValue,
+                    $timeMatches
+                );
+
+
+                $times =
+                    $timeMatches[0]
+                    ?? [];
+
+
+                if (empty($times)) {
+
+                    $skipped++;
+
+                    continue;
+                }
+
+
+                // =================================================
+                // SIMPAN SEMUA SCAN
+                // =================================================
+                foreach (
+                    $times as $time
+                ) {
+
+                    try {
+
+                        $scanTime =
+                            \Carbon\Carbon::createFromFormat(
+                                'Y-m-d H:i',
+                                $tanggal->format(
+                                    'Y-m-d'
+                                )
+                                . ' '
+                                . $time
+                            )->format(
+                                'Y-m-d H:i:s'
+                            );
+
+                    } catch (
+                        \Throwable $e
+                    ) {
+
+                        $skipped++;
+
+                        continue;
+                    }
+
+
+                    // =================================================
+                    // FIRST OR CREATE
+                    // =================================================
+                    $log =
+                        \App\Models\AttendanceLog::firstOrCreate(
+                            [
+                                'employee_id' =>
+                                    $employee->id,
+
+                                'scan_time' =>
+                                    $scanTime,
+                            ],
+                            [
+                                'uid' =>
+                                    $employee->uid,
+                            ]
+                        );
+
+
+                    if (
+                        $log->wasRecentlyCreated
+                    ) {
+
+                        $insertedLogs++;
+
+                    } else {
+
+                        $duplicates++;
+                    }
+                }
+            }
+
+
+            // =================================================
+            // LEWATI BARIS SCAN
+            // =================================================
+            $row++;
+        }
+
+
+        // =================================================
+        // HASIL
+        // =================================================
+        return [
+
+            'format' =>
+                'tk_gama_detail',
+
+            'inserted_logs' =>
+                $insertedLogs,
+
+            'saved_attendances' =>
+                0,
+
+            'duplicates' =>
+                $duplicates,
+
+            'skipped' =>
+                $skipped,
+
+            'missing_uids' =>
+                $missingUids,
+
+            // GM tetap RAW LOG
+            // sehingga Process Data tetap digunakan
+            'needs_process' =>
+                true,
+        ];
     }
 }
