@@ -2130,9 +2130,13 @@ class AttendanceFileImportService
 
 
             // Baris 4 harus berisi nomor tanggal
+            $highestColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString(
+                $sheet->getHighestColumn()
+            );
+
             for (
                 $column = 1;
-                $column <= 15;
+                $column <= $highestColumn;
                 $column++
             ) {
 
@@ -2373,12 +2377,17 @@ class AttendanceFileImportService
 
 
             // =================================================
-            // 15 KOLOM TANGGAL
-            // A:O
+            // KOLOM TANGGAL
+            // Jumlah kolom mengikuti periode/file Excel
+            // Tidak lagi dibatasi 15 hari
             // =================================================
+            $highestColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString(
+                $sheet->getHighestColumn()
+            );
+
             for (
                 $column = 1;
-                $column <= 15;
+                $column <= $highestColumn;
                 $column++
             ) {
 
