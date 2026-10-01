@@ -1,8 +1,11 @@
 @extends('layouts.admin')
 
-@section('title')
-    Approval Izin
-@endsection
+@section('title', 'Approval Izin')
+
+@push('prepend-style')
+<link rel="stylesheet"
+      href="https://cdn.datatables.net/2.3.4/css/dataTables.bootstrap5.css">
+@endpush
 
 @section('content')
 
@@ -11,16 +14,12 @@
     <div class="app-content-header">
         <div class="container-fluid">
 
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="mb-1">
-                        Approval Izin Pegawai
-                    </h1>
+            <h1 class="mb-1">
+                Approval Izin Pegawai
+            </h1>
 
-                    <div class="text-muted">
-                        Daftar pengajuan izin pegawai
-                    </div>
-                </div>
+            <div class="text-muted">
+                Daftar pengajuan izin pegawai
             </div>
 
         </div>
@@ -28,464 +27,159 @@
 
 
     <div class="app-content">
+
         <div class="container-fluid">
 
-
-            {{-- ALERT --}}
             @if(session('message'))
-                <div class="alert alert-success">
+
+                <div class="alert alert-success alert-dismissible fade show">
+
                     {{ session('message') }}
+
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert">
+                    </button>
+
                 </div>
+
             @endif
 
 
             <div class="card shadow-sm">
 
                 <div class="card-header bg-white">
-                    <b>📄 Daftar Pengajuan Izin</b>
+
+                    <strong>
+                        📄 Daftar Pengajuan Izin
+                    </strong>
+
                 </div>
 
 
                 <div class="card-body">
-                    {{-- FILTER TANGGAL --}}
-                    <div class="card border mb-4">
-
-                        <div class="card-body">
-
-                            <form
-                                method="GET"
-                                action="{{ route('attendancePermission.index') }}"
-                            >
-
-                                <div class="row g-3 align-items-end">
-
-                                    {{-- DARI --}}
-                                    <div class="col-md-4">
-
-                                        <label class="form-label fw-semibold">
-                                            Dari Tanggal
-                                        </label>
-
-                                        <input
-                                            type="date"
-                                            name="date_from"
-                                            class="form-control"
-                                            value="{{ $dateFrom ?? '' }}"
-                                        >
-
-                                    </div>
 
 
-                                    {{-- SAMPAI --}}
-                                    <div class="col-md-4">
+                    {{-- =====================================================
+                        FILTER
+                    ====================================================== --}}
 
-                                        <label class="form-label fw-semibold">
-                                            Sampai Tanggal
-                                        </label>
+                    <div class="row g-3 mb-4">
 
-                                        <input
-                                            type="date"
-                                            name="date_to"
-                                            class="form-control"
-                                            value="{{ $dateTo ?? '' }}"
-                                        >
+                        <div class="col-md-4">
 
-                                    </div>
+                            <label class="form-label fw-semibold">
+                                Dari Tanggal
+                            </label>
+
+                            <input type="date"
+                                   id="date_from"
+                                   class="form-control"
+                                   value="{{ $dateFrom ?? '' }}">
+
+                        </div>
 
 
-                                    {{-- BUTTON --}}
-                                    <div class="col-md-4">
+                        <div class="col-md-4">
 
-                                        <div class="d-flex gap-2">
+                            <label class="form-label fw-semibold">
+                                Sampai Tanggal
+                            </label>
 
-                                            <button
-                                                type="submit"
-                                                class="btn btn-primary"
-                                            >
-                                                <i class="fa-solid fa-filter me-1"></i>
-                                                Filter
-                                            </button>
+                            <input type="date"
+                                   id="date_to"
+                                   class="form-control"
+                                   value="{{ $dateTo ?? '' }}">
 
-                                            <a
-                                                href="{{ route('attendancePermission.index') }}"
-                                                class="btn btn-outline-secondary"
-                                            >
-                                                <i class="fa-solid fa-rotate-left me-1"></i>
-                                                Reset
-                                            </a>
+                        </div>
 
-                                        </div>
 
-                                    </div>
+                        <div class="col-md-4 d-flex align-items-end gap-2">
 
-                                </div>
+                            <button type="button"
+                                    id="btnFilter"
+                                    class="btn btn-primary">
 
-                            </form>
+                                <i class="fa-solid fa-filter me-1"></i>
+                                Filter
+
+                            </button>
+
+
+                            <button type="button"
+                                    id="btnReset"
+                                    class="btn btn-outline-secondary">
+
+                                <i class="fa-solid fa-rotate-left me-1"></i>
+                                Reset
+
+                            </button>
 
                         </div>
 
                     </div>
 
+
+                    {{-- =====================================================
+                        TABLE
+                    ====================================================== --}}
+
                     <div class="table-responsive">
 
-                        <table class="table table-bordered table-hover align-middle">
+                        <table id="permissionTable"
+                               class="table table-bordered table-hover align-middle w-100">
 
                             <thead class="table-light">
+
                                 <tr>
-                                    <th width="50">No</th>
-                                    <th>Pegawai</th>
-                                    <th>Unit</th>
-                                    <th>Tanggal</th>
-                                    <th>Jam</th>
-                                    <th>Jenis</th>
-                                    <th>Keterangan</th>
-                                    <th>Status</th>
-                                    <th>Lampiran</th>
+
+                                    <th width="50">
+                                        No
+                                    </th>
+
+                                    <th>
+                                        Pegawai
+                                    </th>
+
+                                    <th>
+                                        Unit
+                                    </th>
+
+                                    <th>
+                                        Tanggal
+                                    </th>
+
+                                    <th>
+                                        Jam
+                                    </th>
+
+                                    <th>
+                                        Jenis
+                                    </th>
+
+                                    <th>
+                                        Keterangan
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Lampiran
+                                    </th>
+
                                     @if(!$isTU)
-                                        <th width="260">Aksi</th>
+
+                                        <th width="260">
+                                            Aksi
+                                        </th>
+
                                     @endif
+
                                 </tr>
+
                             </thead>
-
-
-                            <tbody>
-
-                                @forelse($permissions as $permission)
-
-                                    <tr>
-
-                                        {{-- NO --}}
-                                        <td>
-                                            {{ $loop->iteration }}
-                                        </td>
-
-
-                                        {{-- PEGAWAI --}}
-                                        <td>
-                                            <b>
-                                                {{ $permission->employee->nama ?? '-' }}
-                                            </b>
-                                        </td>
-
-
-                                        {{-- UNIT --}}
-                                        <td>
-                                            {{ $permission->employee->unit->nama ?? '-' }}
-                                        </td>
-
-
-                                        {{-- TANGGAL --}}
-                                        <td>
-
-                                            {{ optional($permission->date_start)->format('d-m-Y') }}
-
-                                            @if(
-                                                $permission->date_end &&
-                                                $permission->date_start &&
-                                                $permission->date_end->format('Y-m-d')
-                                                !==
-                                                $permission->date_start->format('Y-m-d')
-                                            )
-
-                                                <br>
-
-                                                <span class="text-muted">
-                                                    s/d
-                                                    {{ $permission->date_end->format('d-m-Y') }}
-                                                </span>
-
-                                            @endif
-
-                                        </td>
-
-
-                                        {{-- JAM --}}
-                                        <td>
-
-                                            {{-- ================================================
-                                                IZIN KELUAR SEMENTARA
-                                            ================================================= --}}
-                                            @if(
-                                                in_array(
-                                                    $permission->type,
-                                                    [
-                                                        'Izin Keluar Sementara',
-                                                        'Keperluan Pribadi'
-                                                    ],
-                                                    true
-                                                )
-                                            )
-
-                                                @if($permission->time_start && $permission->time_end)
-
-                                                    <span style="font-weight:600;">
-
-                                                        {{ substr($permission->time_start, 0, 5) }}
-
-                                                        <br>
-
-                                                        <span style="font-weight:400;">
-                                                            s/d
-                                                        </span>
-
-                                                        <br>
-
-                                                        {{ substr($permission->time_end, 0, 5) }}
-
-                                                    </span>
-
-                                                @else
-
-                                                    <span class="text-muted">
-                                                        -
-                                                    </span>
-
-                                                @endif
-
-
-                                            {{-- ================================================
-                                                IZIN TERLAMBAT
-                                            ================================================= --}}
-                                            @elseif($permission->type === 'Izin Terlambat')
-
-                                                @if($permission->time_start)
-
-                                                    <div style="color:#dc3545; font-weight:600;">
-
-                                                        <i class="fa-solid fa-clock me-1"></i>
-
-                                                        Datang:
-                                                        {{ substr($permission->time_start, 0, 5) }}
-
-                                                    </div>
-
-                                                @else
-
-                                                    <span class="text-muted">
-                                                        Jam belum diisi
-                                                    </span>
-
-                                                @endif
-
-
-                                            {{-- ================================================
-                                                IZIN PULANG AWAL
-                                            ================================================= --}}
-                                            @elseif($permission->type === 'Izin Pulang Awal')
-
-                                                @if($permission->time_start)
-
-                                                    <div style="color:#fd7e14; font-weight:600;">
-
-                                                        <i class="fa-solid fa-person-walking-arrow-right me-1"></i>
-
-                                                        Pulang:
-                                                        {{ substr($permission->time_start, 0, 5) }}
-
-                                                    </div>
-
-                                                @else
-
-                                                    <span class="text-muted">
-                                                        Jam belum diisi
-                                                    </span>
-
-                                                @endif
-
-
-                                            {{-- ================================================
-                                                IZIN FULL DAY
-                                            ================================================= --}}
-                                            @else
-
-                                                <span style="
-                                                    color:#6c757d;
-                                                    font-weight:600;
-                                                ">
-
-                                                    <i class="fa-solid fa-calendar-day me-1"></i>
-                                                    Full Day
-
-                                                </span>
-
-                                            @endif
-
-                                        </td>
-
-
-                                        {{-- JENIS --}}
-                                        <td>
-                                            <b>
-                                                {{ $permission->type }}
-                                            </b>
-                                        </td>
-
-
-                                        {{-- KETERANGAN --}}
-                                        <td style="min-width:200px;">
-                                            {{ $permission->description ?? '-' }}
-                                        </td>
-
-
-                                        {{-- STATUS --}}
-                                        <td>
-
-                                            @if($permission->status === 'pending')
-
-                                                <span class="badge bg-warning text-dark">
-                                                    ⏳ Pending
-                                                </span>
-
-                                            @elseif($permission->status === 'approved')
-
-                                                <span class="badge bg-success">
-                                                    ✔ Approved
-                                                </span>
-
-                                            @elseif($permission->status === 'rejected')
-
-                                                <span class="badge bg-danger">
-                                                    ✖ Rejected
-                                                </span>
-
-                                            @else
-
-                                                <span class="badge bg-secondary">
-                                                    {{ $permission->status }}
-                                                </span>
-
-                                            @endif
-
-
-                                            @if($permission->approved_at)
-
-                                                <div
-                                                    class="small text-muted mt-1"
-                                                >
-                                                    {{ $permission->approved_at->format('d-m-Y H:i') }}
-                                                </div>
-
-                                            @endif
-
-                                        </td>
-
-
-                                        {{-- LAMPIRAN --}}
-                                        <td>
-
-                                            @if($permission->attachment)
-
-                                                <a
-                                                    href="{{ asset('storage/'.$permission->attachment) }}"
-                                                    target="_blank"
-                                                    class="btn btn-sm btn-outline-primary"
-                                                >
-                                                    📎 Lihat
-                                                </a>
-
-                                            @else
-
-                                                <span class="text-muted">
-                                                    -
-                                                </span>
-
-                                            @endif
-
-                                        </td>
-
-
-                                        @if (!$isTU)
-                                            {{-- AKSI --}}
-                                            <td>
-
-                                                @if($permission->status === 'pending')
-
-                                                    <div class="d-flex gap-2 flex-wrap">
-
-
-                                                        {{-- APPROVE --}}
-                                                        <form
-                                                            action="{{ route('attendancePermission.approve', $permission->id) }}"
-                                                            method="POST"
-                                                        >
-
-                                                            @csrf
-
-                                                            <button
-                                                                type="submit"
-                                                                class="btn btn-success btn-sm"
-                                                                onclick="return confirm('Setujui izin ini?')"
-                                                            >
-                                                                ✔ Setujui
-                                                            </button>
-
-                                                        </form>
-
-
-                                                        {{-- REJECT --}}
-                                                        <form
-                                                            action="{{ route('attendancePermission.reject', $permission->id) }}"
-                                                            method="POST"
-                                                        >
-
-                                                            @csrf
-
-                                                            <button
-                                                                type="submit"
-                                                                class="btn btn-danger btn-sm"
-                                                                onclick="return confirm('Tolak izin ini?')"
-                                                            >
-                                                                ✖ Tolak
-                                                            </button>
-
-                                                        </form>
-
-                                                    </div>
-
-                                                @else
-
-                                                    <div class="small text-muted">
-
-                                                        Sudah diproses
-
-                                                        @if($permission->approvedBy)
-
-                                                            <br>
-
-                                                            Oleh:
-                                                            <b>
-                                                                {{ $permission->approvedBy->name ?? '-' }}
-                                                            </b>
-
-                                                        @endif
-
-                                                    </div>
-
-                                                @endif
-
-                                            </td>
-                                        @endif
-
-                                    </tr>
-
-                                @empty
-
-                                    <tr>
-
-                                        <td
-                                            colspan="{{ $isTU ? 9 : 10 }}"
-                                            class="text-center py-5 text-muted"
-                                        >
-
-                                            📭 Belum ada pengajuan izin
-
-                                        </td>
-
-                                    </tr>
-
-                                @endforelse
-
-                            </tbody>
 
                         </table>
 
@@ -496,8 +190,253 @@
             </div>
 
         </div>
+
     </div>
 
 </main>
 
 @endsection
+
+
+@push('addon-script')
+
+{{-- =====================================================
+    JQUERY
+===================================================== --}}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+
+{{-- =====================================================
+    DATATABLES
+===================================================== --}}
+<script src="https://cdn.datatables.net/2.3.4/js/dataTables.js"></script>
+<script src="https://cdn.datatables.net/2.3.4/js/dataTables.bootstrap5.js"></script>
+
+
+<script>
+
+$(document).ready(function () {
+
+    const table = $('#permissionTable').DataTable({
+
+        processing: true,
+
+        serverSide: true,
+
+        ajax: {
+
+            url: "{{ route('attendancePermission.datatable') }}",
+
+            type: "GET",
+
+            data: function (d) {
+
+                d.date_from = $('#date_from').val();
+
+                d.date_to = $('#date_to').val();
+
+            },
+
+            error: function (xhr) {
+
+                console.error(
+                    'DataTables AJAX Error:',
+                    xhr.status,
+                    xhr.responseText
+                );
+
+            }
+
+        },
+
+        columns: [
+
+            {
+                data: 'DT_RowIndex',
+                name: 'DT_RowIndex',
+                orderable: false,
+                searchable: false,
+                className: 'text-center'
+            },
+
+            {
+                data: 'pegawai',
+                name: 'pegawai',
+                orderable: false,
+                searchable: true
+            },
+
+            {
+                data: 'unit',
+                name: 'unit',
+                orderable: false,
+                searchable: false
+            },
+
+            {
+                data: 'tanggal',
+                name: 'date_start',
+                orderable: true,
+                searchable: false,
+                className: 'text-nowrap'
+            },
+
+            {
+                data: 'jam',
+                name: 'time_start',
+                orderable: false,
+                searchable: false
+            },
+
+            {
+                data: 'type',
+                name: 'type',
+                orderable: true,
+                searchable: true
+            },
+
+            {
+                data: 'description',
+                name: 'description',
+                orderable: true,
+                searchable: true
+            },
+
+            {
+                data: 'status',
+                name: 'status',
+                orderable: true,
+                searchable: true,
+                className: 'text-center'
+            },
+
+            {
+                data: 'attachment',
+                name: 'attachment',
+                orderable: false,
+                searchable: false,
+                className: 'text-center'
+            }
+
+            @if(!$isTU)
+            ,
+
+            {
+                data: 'aksi',
+                name: 'aksi',
+                orderable: false,
+                searchable: false,
+                className: 'text-center'
+            }
+            @endif
+
+        ],
+
+        order: [
+            [3, 'desc']
+        ],
+
+        pageLength: 10,
+
+        lengthMenu: [
+            [10, 25, 50, 100],
+            [10, 25, 50, 100]
+        ],
+
+        language: {
+
+            processing:
+                'Memuat data...',
+
+            search:
+                'Cari:',
+
+            searchPlaceholder:
+                'Nama pegawai / jenis izin...',
+
+            lengthMenu:
+                'Tampilkan _MENU_ data',
+
+            info:
+                'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+
+            infoEmpty:
+                'Tidak ada data',
+
+            infoFiltered:
+                '(difilter dari _MAX_ total data)',
+
+            zeroRecords:
+                'Data tidak ditemukan',
+
+            emptyTable:
+                'Belum ada pengajuan izin',
+
+            paginate: {
+
+                first:
+                    'Awal',
+
+                last:
+                    'Akhir',
+
+                next:
+                    '›',
+
+                previous:
+                    '‹'
+
+            }
+
+        }
+
+    });
+
+
+    // =====================================================
+    // FILTER
+    // =====================================================
+
+    $('#btnFilter').on('click', function () {
+
+        table.ajax.reload();
+
+    });
+
+
+    // =====================================================
+    // RESET
+    // =====================================================
+
+    $('#btnReset').on('click', function () {
+
+        $('#date_from').val('');
+
+        $('#date_to').val('');
+
+        table.ajax.reload();
+
+    });
+
+
+    // =====================================================
+    // ENTER
+    // =====================================================
+
+    $('#date_from, #date_to').on('keypress', function (e) {
+
+        if (e.which === 13) {
+
+            e.preventDefault();
+
+            table.ajax.reload();
+
+        }
+
+    });
+
+});
+
+</script>
+
+@endpush

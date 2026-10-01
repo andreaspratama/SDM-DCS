@@ -29,11 +29,15 @@ class AttendanceFileImportService
 
     protected int $skipped = 0;
 
+    // DIBAWAH ADALAH PERUBAHAN BARU
+
     private function resetState(): void
     {
         $this->employees = [];
 
         $this->employeesExact = [];
+
+        $this->employeesNormalized = [];
 
         $this->missingUids = [];
 
@@ -647,6 +651,8 @@ class AttendanceFileImportService
             // Dipakai untuk mesin seperti UM:
             // 0003 => 3
             // =====================================================
+
+            // INI JUGA PERUBAHAN BARU YAA ------------------
             $normalizedUid =
                 $this->normalizeUid(
                     $exactUid
@@ -655,7 +661,13 @@ class AttendanceFileImportService
 
             if ($normalizedUid !== '') {
 
+                // Cache umum
                 $this->employees[
+                    $normalizedUid
+                ] = $employee;
+
+                // Cache khusus UID normalized
+                $this->employeesNormalized[
                     $normalizedUid
                 ] = $employee;
             }
@@ -744,6 +756,8 @@ class AttendanceFileImportService
         return $this->employeesExact[$uid];
     }
 
+    
+    // INI JUGA PERUBAHAN BARU YAA --------------------------
     private function employeeByNormalizedUid($uid): ?Employee
     {
         $uid = $this->normalizeUid($uid);
@@ -752,18 +766,14 @@ class AttendanceFileImportService
             return null;
         }
 
-        if (
-            !isset(
-                $this->employeesNormalized[$uid]
-            )
-        ) {
+        if (!isset($this->employees[$uid])) {
 
             $this->missingUids[$uid] = true;
 
             return null;
         }
 
-        return $this->employeesNormalized[$uid];
+        return $this->employees[$uid];
     }
 
     private function importSmaMatrix(

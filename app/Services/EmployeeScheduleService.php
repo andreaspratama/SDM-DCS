@@ -19,175 +19,77 @@ class EmployeeScheduleService
     }
 
 
-    public function getSchedule(
-        Employee $employee,
-        $tanggal
-    ): ?array {
+public function getSchedule(
+    Employee $employee,
+    $tanggal
+): ?array {
 
-        // =====================================================
-        // NORMALISASI TANGGAL
-        // =====================================================
-        $date = Carbon::parse(
-            $tanggal
-        )->toDateString();
+    // =====================================================
+    // NORMALISASI TANGGAL
+    // =====================================================
+    $date = Carbon::parse($tanggal)->toDateString();
 
+    // =====================================================
+    // UNIT PEGAWAI PADA TANGGAL TERSEBUT
+    // =====================================================
+    $unitId =
+        $this->employeeUnitService
+            ->getUnitId(
+                $employee,
+                $date
+            );
 
-        // =====================================================
-        // UNIT PEGAWAI PADA TANGGAL TERSEBUT
-        // =====================================================
-        $unitId =
-            $this->employeeUnitService
-                ->getUnitId(
-                    $employee,
-                    $date
-                );
+    // =====================================================
+    // KALDIK
+    // =====================================================
+    $calendarStatus =
+        $this->workCalendar
+            ->isWorkday(
+                $date,
+                $unitId
+            );
 
+    // Secara eksplisit libur
+    if ($calendarStatus === false) {
+        return null;
+    }
 
-        // =====================================================
-        // 1. CEK WORK CALENDAR / KALDIK
-        // BERDASARKAN UNIT PADA TANGGAL TERSEBUT
-        // =====================================================
-        $calendarStatus =
-            $this->workCalendar
-                ->isWorkday(
-                    $date,
-                    $unitId
-                );
+    $tanggalCarbon =
+        Carbon::parse($date);
 
+    // =====================================================
+    // 1. JADWAL KHUSUS PEGAWAI
+    //
+    // Sudah eager-loaded oleh controller
+    // =====================================================
+    $specialSchedule =
+        $employee
+            ->employeeWorkSchedules
+            ->filter(function ($schedule) use ($date) {
 
-        // Kaldik secara eksplisit menyatakan LIBUR
-        if ($calendarStatus === false) {
-            return null;
-        }
+                return
+                    $schedule->tanggal_mulai
+                        ->toDateString()
+                    <= $date
 
+                    &&
 
-        $tanggal =
-            Carbon::parse($date);
+                    $schedule->tanggal_selesai
+                        ->toDateString()
+                    >= $date;
+            })
+            ->sortByDesc('id')
+            ->first();
 
-
-        // =====================================================
-        // 2. CEK JADWAL KHUSUS KARYAWAN
-        // =====================================================
-        $specialSchedule =
-            $employee
-                ->employeeWorkSchedules()
-                ->with('days')
-                ->whereDate(
-                    'tanggal_mulai',
-                    '<=',
-                    $tanggal
-                )
-                ->whereDate(
-                    'tanggal_selesai',
-                    '>=',
-                    $tanggal
-                )
-                ->latest('id')
-                ->first();
-
-
-        if ($specialSchedule) {
-
-            $day =
-                $specialSchedule
-                    ->days
-                    ->firstWhere(
-                        'hari',
-                        $tanggal->dayOfWeekIso
-                    );
-
-
-            if (
-                !$day
-                ||
-                $day->is_libur
-            ) {
-                return null;
-            }
-
-
-            return [
-                'jam_masuk' =>
-                    $day->jam_masuk,
-
-                'jam_pulang' =>
-                    $day->jam_pulang,
-
-                'sumber' =>
-                    'khusus',
-
-                'schedule_id' =>
-                    $specialSchedule->id,
-            ];
-        }
-
-
-        // =====================================================
-        // 3. CARI RIWAYAT UNIT + JADWAL
-        // BERDASARKAN TANGGAL
-        // =====================================================
-        $history =
-            $employee
-                ->unitHistories()
-                ->with(
-                    'workSchedule.days'
-                )
-                ->whereDate(
-                    'tanggal_mulai',
-                    '<=',
-                    $date
-                )
-                ->where(
-                    function ($query) use ($date) {
-
-                        $query
-                            ->whereNull(
-                                'tanggal_selesai'
-                            )
-                            ->orWhereDate(
-                                'tanggal_selesai',
-                                '>=',
-                                $date
-                            );
-                    }
-                )
-                ->orderByDesc(
-                    'tanggal_mulai'
-                )
-                ->first();
-
-
-        // =====================================================
-        // 4. JADWAL DASAR SESUAI PERIODE
-        // =====================================================
-        $baseSchedule =
-            $history?->workSchedule;
-
-
-        // =====================================================
-        // FALLBACK UNTUK PEGAWAI LAMA
-        // YANG BELUM PUNYA RIWAYAT UNIT
-        // =====================================================
-        if (!$baseSchedule) {
-
-            $baseSchedule =
-                $employee->workSchedule;
-        }
-
-
-        if (!$baseSchedule) {
-            return null;
-        }
-
+    if ($specialSchedule) {
 
         $day =
-            $baseSchedule
+            $specialSchedule
                 ->days
                 ->firstWhere(
                     'hari',
-                    $tanggal->dayOfWeekIso
+                    $tanggalCarbon->dayOfWeekIso
                 );
-
 
         if (
             !$day
@@ -197,7 +99,6 @@ class EmployeeScheduleService
             return null;
         }
 
-
         return [
             'jam_masuk' =>
                 $day->jam_masuk,
@@ -206,12 +107,88 @@ class EmployeeScheduleService
                 $day->jam_pulang,
 
             'sumber' =>
-                $history
-                    ? 'riwayat_unit'
-                    : 'dasar',
+                'khusus',
 
             'schedule_id' =>
-                $baseSchedule->id,
+                $specialSchedule->id,
         ];
     }
+
+    // =====================================================
+    // 2. JADWAL BERDASARKAN HISTORI UNIT
+    //
+    // Sudah eager-loaded
+    // =====================================================
+    $history =
+        $employee
+            ->unitHistories
+            ->filter(function ($history) use ($date) {
+
+                return
+                    $history->tanggal_mulai
+                        ->toDateString()
+                    <= $date
+
+                    &&
+
+                    (
+                        is_null(
+                            $history->tanggal_selesai
+                        )
+
+                        ||
+
+                        $history->tanggal_selesai
+                            ->toDateString()
+                        >= $date
+                    );
+            })
+            ->sortByDesc(
+                'tanggal_mulai'
+            )
+            ->first();
+
+    // =====================================================
+    // 3. JADWAL DASAR
+    // =====================================================
+    $baseSchedule =
+        $history?->workSchedule
+        ?: $employee->workSchedule;
+
+    if (!$baseSchedule) {
+        return null;
+    }
+
+    $day =
+        $baseSchedule
+            ->days
+            ->firstWhere(
+                'hari',
+                $tanggalCarbon->dayOfWeekIso
+            );
+
+    if (
+        !$day
+        ||
+        $day->is_libur
+    ) {
+        return null;
+    }
+
+    return [
+        'jam_masuk' =>
+            $day->jam_masuk,
+
+        'jam_pulang' =>
+            $day->jam_pulang,
+
+        'sumber' =>
+            $history
+                ? 'histori'
+                : 'dasar',
+
+        'schedule_id' =>
+            $baseSchedule->id,
+    ];
+}
 }

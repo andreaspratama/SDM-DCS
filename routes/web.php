@@ -64,6 +64,7 @@ Route::prefix('admin')
         Route::resource('school-calendar', SchoolCalendarController::class)->except(['show']);
 
         // ATTENDANCE PERMISSIONS
+        Route::get('/attendance-permission/datatable', [AttendancePermissionApprovalController::class, 'datatable'])->name('attendancePermission.datatable');
         Route::get('/attendance-permissions', [AttendancePermissionApprovalController::class, 'index'])->name('attendancePermission.index');
         Route::post('/attendance-permissions/{permission}/approve', [AttendancePermissionApprovalController::class, 'approve'])->name('attendancePermission.approve');
         Route::post('/attendance-permissions/{permission}/reject', [AttendancePermissionApprovalController::class, 'reject'])->name('attendancePermission.reject');
