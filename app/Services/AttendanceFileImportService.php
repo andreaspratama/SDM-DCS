@@ -29,6 +29,15 @@ class AttendanceFileImportService
 
     protected int $skipped = 0;
 
+    // TAMBAHAN BARU -------------------------------
+    protected array $skippedReasons = [
+        'empty_uid' => 0,
+        'empty_datetime' => 0,
+        'invalid_uid' => 0,
+        'employee_not_found' => 0,
+        'invalid_datetime' => 0,
+    ];
+
     // DIBAWAH ADALAH PERUBAHAN BARU
 
     private function resetState(): void
@@ -48,6 +57,14 @@ class AttendanceFileImportService
         $this->duplicates = 0;
 
         $this->skipped = 0;
+
+        $this->skippedReasons = [
+            'empty_uid' => 0,
+            'empty_datetime' => 0,
+            'invalid_uid' => 0,
+            'employee_not_found' => 0,
+            'invalid_datetime' => 0,
+        ];
     }
 
     public function import(
@@ -170,6 +187,9 @@ class AttendanceFileImportService
             'skipped' =>
                 $this->skipped,
 
+            'skipped_reasons' =>
+                $this->skippedReasons,
+
             'missing_uids' =>
                 array_keys($this->missingUids),
 
@@ -184,15 +204,15 @@ class AttendanceFileImportService
             ),
         ];
 
-        return [
-            'format' => $format,
-            'inserted_logs' => 0,
-            'saved_attendances' => 0,
-            'duplicates' => 0,
-            'skipped' => 0,
-            'missing_uids' => [],
-            'needs_process' => false,
-        ];
+        // return [
+        //     'format' => $format,
+        //     'inserted_logs' => 0,
+        //     'saved_attendances' => 0,
+        //     'duplicates' => 0,
+        //     'skipped' => 0,
+        //     'missing_uids' => [],
+        //     'needs_process' => false,
+        // ];
     }
 
 
@@ -479,9 +499,9 @@ class AttendanceFileImportService
             );
         }
 
-        // ==============================
+        // =====================================================
         // CARI POSISI HEADER
-        // ==============================
+        // =====================================================
         $header = array_map(
             fn ($value) => $this->normalizeHeader($value),
             $rows[0]
@@ -500,84 +520,223 @@ class AttendanceFileImportService
         }
 
 
-        // ==============================
-        // PROSES DATA
-        // ==============================
+        // =====================================================
+        // PROSES DATA RAW SCAN
+        // =====================================================
         foreach (array_slice($rows, 1) as $row) {
 
-            $uid = $row[$uidIndex] ?? null;
-            $datetime = $row[$dateTimeIndex] ?? null;
+            // =================================================
+            // AMBIL RAW VALUE
+            // =================================================
+            $rawUid = $row[$uidIndex] ?? null;
+            $rawDateTime = $row[$dateTimeIndex] ?? null;
 
-            $uid = $this->normalizeUid($uid);
-            $datetime = trim((string) $datetime);
 
-            if ($uid === '' || $datetime === '') {
+            // =================================================
+            // UID
+            // =================================================
+            $uid = trim(
+                (string) ($rawUid ?? '')
+            );
+
+
+            // UID kosong
+            if ($uid === '') {
+
                 $this->skipped++;
+
+                $this->skippedReasons['empty_uid']++;
+
                 continue;
             }
 
 
-            // UID 0 dianggap invalid
-            if ($uid === '0') {
-                $this->skipped++;
-                continue;
-            }
-
-
-            // ==============================
-            // CARI EMPLOYEE SESUAI UNIT
-            // ==============================
-            $employee = $this->employeeByNormalizedUid(
+            // =================================================
+            // BERSIHKAN FORMAT EXCEL
+            //
+            // Contoh:
+            // 001.0 → 001
+            // 001   → 001
+            // =================================================
+            $uid = preg_replace(
+                '/\.0+$/',
+                '',
                 $uid
             );
 
-            if (!$employee) {
+            $uid = trim($uid);
+
+
+            // UID 0 dianggap invalid
+            if (
+                $uid === '' ||
+                $this->normalizeUid($uid) === '0'
+            ) {
+
                 $this->skipped++;
+
+                $this->skippedReasons['invalid_uid']++;
+
                 continue;
             }
 
 
-            // ==============================
-            // PARSE TANGGAL
-            // ==============================
-            try {
+            // =================================================
+            // DATETIME
+            // =================================================
+            $datetime = trim(
+                (string) ($rawDateTime ?? '')
+            );
 
-                $scanTime = Carbon::createFromFormat(
-                    'd/m/Y H:i',
-                    $datetime
+
+            if ($datetime === '') {
+
+                $this->skipped++;
+
+                $this->skippedReasons['empty_datetime']++;
+
+                continue;
+            }
+
+
+            // =================================================
+            // CARI EMPLOYEE
+            //
+            // UM menggunakan NORMALIZED UID
+            //
+            // Contoh:
+            // 0001 → 1
+            // 0010 → 10
+            // =================================================
+            $normalizedUid =
+                $this->normalizeUid($uid);
+
+
+            $employee =
+                $this->employeeByNormalizedUid(
+                    $normalizedUid
                 );
 
-            } catch (\Throwable $e) {
+
+            if (!$employee) {
+
+                $this->skipped++;
+
+                $this->skippedReasons['employee_not_found']++;
+
+                continue;
+            }
+
+
+            // =================================================
+            // PARSE DATETIME
+            //
+            // Kita dukung beberapa format mesin fingerprint.
+            // =================================================
+            $scanTime = null;
+
+
+            $formats = [
+                'd/m/Y H:i:s',
+                'd/m/Y H:i',
+                'd-m-Y H:i:s',
+                'd-m-Y H:i',
+                'Y-m-d H:i:s',
+                'Y-m-d H:i',
+                'd/m/Y g:i:s A',
+                'd/m/Y g:i A',
+                'd-m-Y g:i:s A',
+                'd-m-Y g:i A',
+            ];
+
+
+            foreach ($formats as $format) {
 
                 try {
 
-                    $scanTime = Carbon::parse($datetime);
+                    $scanTime =
+                        Carbon::createFromFormat(
+                            $format,
+                            $datetime
+                        );
+
+                    if ($scanTime) {
+                        break;
+                    }
 
                 } catch (\Throwable $e) {
-
-                    $this->skipped++;
-                    continue;
+                    // lanjut ke format berikutnya
                 }
             }
 
 
-            // ==============================
-            // SIMPAN LOG
-            // ==============================
-            $log = AttendanceLog::firstOrCreate(
-                [
-                    'employee_id' => $employee->id,
-                    'scan_time' => $scanTime->format(
-                        'Y-m-d H:i:s'
-                    ),
-                ],
-                [
-                    'uid' => $employee->uid,
-                ]
-            );
+            // =================================================
+            // FALLBACK CARBON PARSE
+            // =================================================
+            if (!$scanTime) {
+
+                try {
+
+                    $scanTime =
+                        Carbon::parse($datetime);
+
+                } catch (\Throwable $e) {
+
+                    $scanTime = null;
+                }
+            }
 
 
-            if ($log->wasRecentlyCreated) {
+            // =================================================
+            // DATETIME BENAR-BENAR TIDAK VALID
+            // =================================================
+            if (!$scanTime) {
+
+                $this->skipped++;
+
+                $this->skippedReasons['invalid_datetime']++;
+
+                continue;
+            }
+
+
+            // =================================================
+            // SIMPAN RAW SCAN
+            //
+            // PENTING:
+            // JANGAN menentukan IN / OUT di sini.
+            //
+            // Semua scan valid disimpan sebagai raw log.
+            // Process Absensi yang nanti menentukan:
+            // - check in
+            // - check out
+            // - keterlambatan
+            // - pulang cepat
+            // =================================================
+            $log =
+                AttendanceLog::firstOrCreate(
+                    [
+                        'employee_id' =>
+                            $employee->id,
+
+                        'scan_time' =>
+                            $scanTime->format(
+                                'Y-m-d H:i:s'
+                            ),
+                    ],
+                    [
+                        'uid' =>
+                            $employee->uid,
+                    ]
+                );
+
+
+            // =================================================
+            // HITUNG HASIL
+            // =================================================
+            if (
+                $log->wasRecentlyCreated
+            ) {
 
                 $this->insertedLogs++;
 
