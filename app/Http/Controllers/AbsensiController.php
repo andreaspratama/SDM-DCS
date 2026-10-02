@@ -2922,13 +2922,62 @@ class AbsensiController extends Controller
             }
 
             if (($result['skipped'] ?? 0) > 0) {
+
                 $message .=
                     'Skipped: ' .
                     number_format($result['skipped']) .
                     '. ';
+
+                // =====================================================
+                // ALASAN SKIPPED
+                // =====================================================
+
+                $skippedReasons =
+                    $result['skipped_reasons'] ?? [];
+
+                $labels = [
+                    'empty_uid' =>
+                        'UID kosong',
+
+                    'empty_datetime' =>
+                        'Tanggal/waktu kosong',
+
+                    'invalid_uid' =>
+                        'UID tidak valid',
+
+                    'employee_not_found' =>
+                        'Pegawai tidak ditemukan',
+
+                    'invalid_datetime' =>
+                        'Tanggal/waktu tidak valid',
+                ];
+
+                $reasonTexts = [];
+
+                foreach ($skippedReasons as $reason => $count) {
+
+                    if ((int) $count <= 0) {
+                        continue;
+                    }
+
+                    $label =
+                        $labels[$reason] ?? $reason;
+
+                    $reasonTexts[] =
+                        $label . ': ' . number_format($count);
+                }
+
+                if (!empty($reasonTexts)) {
+
+                    $message .=
+                        'Alasan skipped: ' .
+                        implode(', ', $reasonTexts) .
+                        '. ';
+                }
             }
 
             if (($result['needs_process'] ?? false) === true) {
+
                 $message .=
                     'File ini berisi raw scan. ' .
                     'Silakan klik Process Absensi.';
