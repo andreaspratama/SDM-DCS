@@ -726,43 +726,157 @@
         }
     }
 
+// =====================================================
+// KHUSUS TK TAMA
+// DETAIL SCAN TAMBAHAN
+// =====================================================
 
-    // =====================================================
-    // PULANG CEPAT
-    // =====================================================
-    if ($pulangCepat) {
+$isTkTama =
+    $employee->unit
+    &&
+    (
+        str_contains(
+            strtolower((string) $employee->unit->nama),
+            'tama'
+        )
+        ||
+        str_contains(
+            strtolower((string) ($employee->unit->code ?? '')),
+            'tama'
+        )
+        ||
+        strtolower((string) ($employee->unit->code ?? '')) === 'tm'
+    );
 
-        $pulangFix =
-            \Carbon\Carbon::parse(
-                $row['tanggal']
-                . ' '
-                . $jamPulang
-            );
 
-        $standarPulangFix =
-            \Carbon\Carbon::parse(
-                $row['tanggal']
-                . ' '
-                . $jamPulangStandar
-            );
+if (
+    $isTkTama
+    &&
+    $att
+    &&
+    $att->activities
+) {
 
-        $menitPulangCepat =
-            (int) $pulangFix
-                ->diffInMinutes(
-                    $standarPulangFix
+    $activitiesTkTama =
+        $att->activities
+            ->sortBy('time')
+            ->values();
+
+
+    for (
+        $i = 0;
+        $i < $activitiesTkTama->count() - 1;
+        $i++
+    ) {
+
+        $current =
+            $activitiesTkTama[$i];
+
+        $next =
+            $activitiesTkTama[$i + 1];
+
+
+        // =================================================
+        // IN → IN
+        //
+        // Contoh:
+        // 06:49 IN
+        // 11:00 IN
+        // 16:02 OUT
+        //
+        // Hasil:
+        // Scan Masuk Tambahan: 11:00
+        // =================================================
+        if (
+            $current->type === 'in'
+            &&
+            $next->type === 'in'
+        ) {
+
+            $timeline[] = [
+
+                'text' =>
+                    '🔵 Scan Masuk Tambahan: '
+                    . $next->time,
+
+                'color' =>
+                    '#0d6efd',
+            ];
+
+            continue;
+        }
+
+
+        // =================================================
+        // OUT → OUT
+        //
+        // Contoh:
+        // 06:48 IN
+        // 10:50 OUT
+        // 15:06 OUT
+        //
+        // Hasil:
+        // Keluar Tanpa Scan Masuk Kembali:
+        // 256 menit (10:50 - 15:06)
+        // =================================================
+        if (
+            $current->type === 'out'
+            &&
+            $next->type === 'out'
+        ) {
+
+            $jamKeluarTk =
+                \Carbon\Carbon::parse(
+                    $row['tanggal']
+                    . ' '
+                    . $current->time
                 );
 
-        $timeline[] = [
 
-            'text' =>
-                '🏃 Pulang Cepat: '
-                . $menitPulangCepat
-                . ' menit',
+            $jamCheckoutTk =
+                \Carbon\Carbon::parse(
+                    $row['tanggal']
+                    . ' '
+                    . $next->time
+                );
 
-            'color' =>
-                '#c2410c',
-        ];
+
+            $durasiTk = 0;
+
+
+            if (
+                $jamKeluarTk->lt(
+                    $jamCheckoutTk
+                )
+            ) {
+
+                $durasiTk =
+                    (int) $jamKeluarTk
+                        ->diffInMinutes(
+                            $jamCheckoutTk
+                        );
+            }
+
+
+            $timeline[] = [
+
+                'text' =>
+                    '🚨 Keluar Tanpa Scan Masuk Kembali: '
+                    . $durasiTk
+                    . ' menit ('
+                    . $current->time
+                    . ' - '
+                    . $next->time
+                    . ')',
+
+                'color' =>
+                    '#dc2626',
+            ];
+
+            continue;
+        }
     }
+}
 
 @endphp
 

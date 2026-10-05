@@ -371,16 +371,60 @@ class AttendanceFileImportService
 
 
             // -----------------------------------------------------
-            // SD / SMP
-            // -----------------------------------------------------
-            // Nama | No. Staff | Dept. | Tanggal | Hari | ...
-            // ... Jadwal masuk | Masuk | Jadwal keluar | Keluar
+            // DAILY SCHOOL / TK TAMA
             // -----------------------------------------------------
 
             $header = array_map(
                 fn ($value) => $this->normalizeHeader($value),
                 $rows[0] ?? []
             );
+
+            // =====================================================
+            // TK TAMA
+            //
+            // Struktur aktual:
+            //
+            // Nama
+            // No. Staff
+            // Dept.
+            // Tanggal
+            // Hari
+            // Tipe
+            // Jadwal
+            // [kosong]
+            // Masuk
+            // [kosong]
+            // Keluar
+            // Masuk
+            // Keluar
+            // Lembur Masuk
+            // Lembur Keluar
+            // =====================================================
+
+            if (
+                ($header[0] ?? '') === 'nama' &&
+                ($header[1] ?? '') === 'no. staff' &&
+                ($header[2] ?? '') === 'dept.' &&
+                ($header[3] ?? '') === 'tanggal' &&
+                ($header[4] ?? '') === 'hari' &&
+                ($header[5] ?? '') === 'tipe' &&
+                ($header[6] ?? '') === 'jadwal' &&
+                ($header[8] ?? '') === 'masuk' &&
+                ($header[10] ?? '') === 'keluar' &&
+                ($header[11] ?? '') === 'masuk' &&
+                ($header[12] ?? '') === 'keluar' &&
+                ($header[13] ?? '') === 'lembur masuk' &&
+                ($header[14] ?? '') === 'lembur keluar'
+            ) {
+                return 'tktama_daily';
+            }
+
+            // =====================================================
+            // SD / SMP
+            // =====================================================
+            //
+            // Jangan sampai format TK Tama masuk sini.
+            // =====================================================
 
             if (
                 ($header[0] ?? '') === 'nama' &&
@@ -395,18 +439,26 @@ class AttendanceFileImportService
             // -----------------------------------------------------
             // TK TAMA
             // -----------------------------------------------------
-            // Nama | No. Staff | Jadwal | Masuk | Keluar | ...
+            // Format terbaru:
             //
-            // lalu ada:
-            // GURU--------01/08/2026
+            // Nama
+            // No. Staff
+            // Tanggal
+            // Hari
+            // Masuk
+            // Keluar
+            // Masuk
+            // Keluar
+            // Lembur Masuk
+            // Lembur Keluar
             // -----------------------------------------------------
-
             if (
                 ($header[0] ?? '') === 'nama' &&
                 ($header[1] ?? '') === 'no. staff' &&
-                ($header[2] ?? '') === 'jadwal' &&
-                ($header[3] ?? '') === 'masuk' &&
-                ($header[4] ?? '') === 'keluar'
+                ($header[2] ?? '') === 'tanggal' &&
+                ($header[3] ?? '') === 'hari' &&
+                ($header[4] ?? '') === 'masuk' &&
+                ($header[5] ?? '') === 'keluar'
             ) {
                 return 'tktama_daily';
             }
@@ -2248,15 +2300,6 @@ class AttendanceFileImportService
 
         $spreadsheet = IOFactory::load($path);
 
-        // =========================================================
-        // TK TAMA
-        //
-        // Format:
-        // Nama | No. Staff | Jadwal | Masuk | Keluar | ...
-        //
-        // Tanggal berada pada baris pemisah, contoh:
-        // GURU--------01/08/2026
-        // =========================================================
         foreach ($spreadsheet->getWorksheetIterator() as $worksheet) {
 
             $rows = $worksheet->toArray(
@@ -2266,67 +2309,53 @@ class AttendanceFileImportService
                 false
             );
 
-            $currentDate = null;
+            foreach ($rows as $index => $row) {
 
-
-            foreach ($rows as $row) {
-
-                $firstColumn = trim(
-                    (string) ($row[0] ?? '')
-                );
-
-
-                // =================================================
-                // DETEKSI TANGGAL
-                //
-                // contoh:
-                // GURU--------01/08/2026
-                // =================================================
                 if (
-                    preg_match(
-                        '/(\d{2}\/\d{2}\/\d{4})/',
-                        $firstColumn,
-                        $matches
-                    )
-                ) {
+        in_array(
+            'Hanna Megawati',
+            array_map(
+                fn ($value) => trim((string) $value),
+                $row
+            ),
+            true
+        )
+    ) {
+        dd([
+            'index' => $index,
+            'row' => $row,
+        ]);
+    }
 
-                    try {
-
-                        $currentDate = Carbon::createFromFormat(
-                            'd/m/Y',
-                            $matches[1]
-                        )->format('Y-m-d');
-
-                    } catch (\Throwable $e) {
-
-                        $currentDate = null;
-                    }
-
+                // =====================================================
+                // SKIP BARIS KOSONG
+                // =====================================================
+                if (empty(array_filter(
+                    $row,
+                    fn ($value) =>
+                        $value !== null &&
+                        trim((string) $value) !== ''
+                ))) {
                     continue;
                 }
 
 
-                // Belum menemukan tanggal
-                if (!$currentDate) {
-                    continue;
-                }
-
-
-                // =================================================
-                // SKIP HEADER
-                // =================================================
-                if (
+                // =====================================================
+                // HEADER
+                // =====================================================
+                $firstColumn =
                     $this->normalizeHeader(
-                        $firstColumn
-                    ) === 'nama'
-                ) {
+                        $row[0] ?? ''
+                    );
+
+                if ($firstColumn === 'nama') {
                     continue;
                 }
 
 
-                // =================================================
-                // DATA EMPLOYEE
-                // =================================================
+                // =====================================================
+                // UID
+                // =====================================================
                 $uid = trim(
                     (string) ($row[1] ?? '')
                 );
@@ -2336,59 +2365,542 @@ class AttendanceFileImportService
                 }
 
 
-                // =================================================
-                // JAM AKTUAL
-                //
-                // col 2 = Jadwal mesin
-                // col 3 = Masuk aktual
-                // col 4 = Keluar aktual
-                // =================================================
-                $checkIn = $this->parseDailyTime(
-                    $row[3] ?? null
-                );
+                // =====================================================
+                // TANGGAL
+                // =====================================================
+                $dateValue =
+                    $row[2] ?? null;
 
-                $checkOut = $this->parseDailyTime(
-                    $row[4] ?? null
-                );
-
-
-                // Tidak ada fingerprint sama sekali
-                if (!$checkIn && !$checkOut) {
+                if (
+                    $dateValue === null ||
+                    trim((string) $dateValue) === ''
+                ) {
                     continue;
                 }
 
 
-                // =================================================
-                // EMPLOYEE
-                // =================================================
-                $employee = $this->employeeByExactUid(
-                    $uid
-                );
+                try {
 
+                    if (
+                        $dateValue
+                        instanceof \DateTimeInterface
+                    ) {
+
+                        $date =
+                            Carbon::instance(
+                                $dateValue
+                            )->format('Y-m-d');
+
+                    } else {
+
+                        $date =
+                            Carbon::createFromFormat(
+                                'd/m/Y',
+                                trim(
+                                    (string) $dateValue
+                                )
+                            )->format('Y-m-d');
+                    }
+
+                } catch (\Throwable $e) {
+
+                    $this->skipped++;
+
+                    $this->skippedReasons[] =
+                        "Tanggal TK Tama tidak valid: {$dateValue}";
+
+                    continue;
+                }
+
+
+                // =====================================================
+                // EMPLOYEE
+                // =====================================================
+                $employee =
+                    $this->employeeByExactUid(
+                        $uid
+                    );
 
                 if (!$employee) {
 
                     $this->skipped++;
 
+                    $this->skippedReasons[] =
+                        "UID TK Tama belum terdaftar: {$uid}";
+
+                    $this->missingUids[$uid] = true;
+
                     continue;
                 }
 
 
-                // =================================================
-                // SIMPAN
+                // =====================================================
+                // AMBIL SEMUA SCAN TK TAMA
                 //
-                // Penting:
-                // - boleh hanya Masuk
-                // - boleh hanya Keluar
-                // =================================================
-                $this->saveDailyAttendance(
+                // Format Excel:
+                // 0 = Nama
+                // 1 = No. Staff
+                // 2 = Tanggal
+                // 3 = Hari
+                // 4 = Masuk
+                // 5 = Keluar
+                // 6 = Masuk
+                // 7 = Keluar
+                // 8 = Lembur Masuk
+                // 9 = Lembur Keluar
+                // =====================================================
+                $scanColumns = [
+
+                    // ABSENSI REGULER
+                    4 => [
+                        'type' => 'in',
+                        'overtime' => false,
+                    ],
+
+                    5 => [
+                        'type' => 'out',
+                        'overtime' => false,
+                    ],
+
+                    6 => [
+                        'type' => 'in',
+                        'overtime' => false,
+                    ],
+
+                    7 => [
+                        'type' => 'out',
+                        'overtime' => false,
+                    ],
+
+                    // LEMBUR
+                    8 => [
+                        'type' => 'in',
+                        'overtime' => true,
+                    ],
+
+                    9 => [
+                        'type' => 'out',
+                        'overtime' => true,
+                    ],
+                ];
+
+                $activities = [];
+
+                foreach ($scanColumns as $column => $config) {
+
+                    $time = $this->parseTkTamaTime(
+                        $row[$column] ?? null
+                    );
+
+                    if (!$time) {
+                        continue;
+                    }
+
+                    $activities[] = [
+                        'time' => $time,
+                        'type' => $config['type'],
+                        'overtime' => $config['overtime'],
+                    ];
+                }
+
+
+                // =====================================================
+                // TIDAK ADA SCAN
+                // =====================================================
+                if (empty($activities)) {
+                    continue;
+                }
+
+
+                // =====================================================
+                // SORT BERDASARKAN JAM
+                // =====================================================
+                usort(
+                    $activities,
+                    function ($a, $b) {
+
+                        return strcmp(
+                            $a['time'],
+                            $b['time']
+                        );
+                    }
+                );
+
+
+                // =====================================================
+                // CHECK IN = IN TERAWAL
+                // CHECK OUT = OUT TERAKHIR
+                // =====================================================
+                $checkIn = null;
+                $checkOut = null;
+
+
+                foreach ($activities as $activity) {
+
+                    if (
+                        $activity['type'] === 'in'
+                        &&
+                        $checkIn === null
+                    ) {
+
+                        $checkIn =
+                            $activity['time'];
+                    }
+
+
+                    if (
+                        $activity['type'] === 'out'
+                    ) {
+
+                        $checkOut =
+                            $activity['time'];
+                    }
+                }
+
+
+                // =====================================================
+                // SIMPAN KHUSUS TK TAMA
+                // =====================================================
+                $this->saveTkTamaAttendance(
                     $employee,
-                    $currentDate,
+                    $date,
                     $checkIn,
                     $checkOut,
+                    $activities,
                     $scheduleService
                 );
             }
+        }
+    }
+
+    private function saveTkTamaAttendance(
+        Employee $employee,
+        string $date,
+        ?string $checkIn,
+        ?string $checkOut,
+        array $activities,
+        EmployeeScheduleService $scheduleService
+    ): void {
+
+        // =====================================================
+        // TIDAK ADA SCAN
+        // =====================================================
+        if (
+            !$checkIn &&
+            !$checkOut
+        ) {
+            return;
+        }
+
+
+        // =====================================================
+        // UNIT EMPLOYEE PADA TANGGAL TERSEBUT
+        // =====================================================
+        $unitId =
+            app(\App\Services\EmployeeUnitService::class)
+                ->getUnitId(
+                    $employee,
+                    $date
+                );
+
+
+        // =====================================================
+        // KALDIK
+        //
+        // true  = eksplisit hari kerja
+        // false = eksplisit libur
+        // null  = tidak ada override
+        // =====================================================
+        $calendarService =
+            app(\App\Services\WorkCalendarService::class);
+
+        $calendar =
+            $calendarService->getCalendar(
+                $date,
+                $unitId
+            );
+
+        $calendarWorkday =
+            $calendar
+                ? (bool) $calendar->is_workday
+                : null;
+
+
+        // =====================================================
+        // JADWAL NORMAL
+        // =====================================================
+        $schedule =
+            $scheduleService->getSchedule(
+                $employee,
+                $date
+            );
+
+
+        // =====================================================
+        // CEK APAKAH ADA SCAN DARI KOLOM LEMBUR
+        // =====================================================
+        $hasOvertimeScan = collect($activities)
+            ->contains(
+                fn ($activity) =>
+                    !empty($activity['overtime'])
+            );
+
+
+        // =====================================================
+        // TENTUKAN APAKAH INI LEMBUR
+        //
+        // 1. Ada scan lembur dari Excel
+        //    ATAU
+        // 2. Kaldik secara eksplisit libur
+        //
+        // Tapi jika ada jadwal normal dan scan normal,
+        // jangan dianggap lembur hanya karena calendar null.
+        // =====================================================
+        $isLemburHariLibur =
+            $hasOvertimeScan
+            ||
+            $calendarWorkday === false;
+
+
+        // =====================================================
+        // STATUS
+        // =====================================================
+        $status =
+            $isLemburHariLibur
+                ? 'lembur'
+                : 'hadir';
+
+
+        // =====================================================
+        // HITUNG TERLAMBAT
+        //
+        // Hanya attendance normal.
+        // Lembur tidak dihitung terlambat.
+        // =====================================================
+        $lateMinutes = 0;
+
+        if (
+            !$isLemburHariLibur
+            &&
+            $checkIn
+            &&
+            $schedule
+            &&
+            !empty($schedule['jam_masuk'])
+        ) {
+
+            try {
+
+                $actualIn =
+                    Carbon::parse(
+                        $date . ' ' . $checkIn
+                    );
+
+                $expectedIn =
+                    Carbon::parse(
+                        $date . ' ' .
+                        $schedule['jam_masuk']
+                    );
+
+                if (
+                    $actualIn->greaterThan(
+                        $expectedIn
+                    )
+                ) {
+
+                    $lateMinutes =
+                        (int) $expectedIn
+                            ->diffInMinutes(
+                                $actualIn
+                            );
+                }
+
+            } catch (\Throwable $e) {
+
+                $lateMinutes = 0;
+            }
+        }
+
+
+        // =====================================================
+        // SIMPAN ATTENDANCE
+        // =====================================================
+        $attendance =
+            Attendance::updateOrCreate(
+                [
+                    'employee_id' =>
+                        $employee->id,
+
+                    'date' =>
+                        $date,
+                ],
+                [
+                    'check_in' =>
+                        $checkIn,
+
+                    'check_out' =>
+                        $checkOut,
+
+                    'late_minutes' =>
+                        $lateMinutes,
+
+                    'status' =>
+                        $status,
+                ]
+            );
+
+
+        // =====================================================
+        // COUNTER
+        // =====================================================
+        if (
+            $attendance->wasRecentlyCreated
+            ||
+            $attendance->wasChanged()
+        ) {
+
+            $this->savedAttendances++;
+
+        } else {
+
+            $this->duplicates++;
+        }
+
+
+        // =====================================================
+        // HAPUS ACTIVITY LAMA
+        // =====================================================
+        $attendance
+            ->activities()
+            ->delete();
+
+
+        // =====================================================
+        // SIMPAN SEMUA ACTIVITY
+        // =====================================================
+        foreach ($activities as $activity) {
+
+            $attendance
+                ->activities()
+                ->create([
+                    'time' =>
+                        $activity['time'],
+
+                    'type' =>
+                        $activity['type'],
+
+                    'is_with_permission' =>
+                        false,
+                ]);
+        }
+    }
+
+    private function parseTkTamaTime($value): ?string
+    {
+        // =========================================================
+        // NULL
+        // =========================================================
+
+        if ($value === null) {
+            return null;
+        }
+
+        // =========================================================
+        // DateTime dari PhpSpreadsheet
+        // =========================================================
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('H:i:s');
+        }
+
+        // =========================================================
+        // Excel TIME SERIAL
+        //
+        // Contoh:
+        // 0.284027... = 06:49
+        // =========================================================
+
+        if (is_numeric($value)) {
+
+            try {
+
+                $numericValue = (float) $value;
+
+                // Pastikan ini benar-benar nilai waktu,
+                // bukan angka UID atau angka lain.
+                if (
+                    $numericValue >= 0 &&
+                    $numericValue < 1
+                ) {
+
+                    return \PhpOffice\PhpSpreadsheet\Shared\Date
+                        ::excelToDateTimeObject($numericValue)
+                        ->format('H:i:s');
+                }
+
+            } catch (\Throwable $e) {
+
+                return null;
+            }
+
+            return null;
+        }
+
+        // =========================================================
+        // STRING
+        // =========================================================
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        // =========================================================
+        // FORMAT JAM TK TAMA
+        //
+        // 6:49
+        // 06:49
+        // 6:49:00
+        // 06:49:00
+        // =========================================================
+
+        $formats = [
+            'G:i',
+            'H:i',
+            'G:i:s',
+            'H:i:s',
+        ];
+
+        foreach ($formats as $format) {
+
+            try {
+
+                $time = Carbon::createFromFormat(
+                    $format,
+                    $value
+                );
+
+                return $time->format('H:i:s');
+
+            } catch (\Throwable $e) {
+
+                // Coba format berikutnya
+            }
+        }
+
+        // =========================================================
+        // FALLBACK
+        // =========================================================
+
+        try {
+
+            return Carbon::parse($value)
+                ->format('H:i:s');
+
+        } catch (\Throwable $e) {
+
+            return null;
         }
     }
 

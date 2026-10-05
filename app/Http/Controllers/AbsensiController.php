@@ -168,1056 +168,907 @@ class AbsensiController extends Controller
     }
 
     public function datatable(
-    Request $request,
-    EmployeeScheduleService $scheduleService,
-    WorkCalendarService $calendarService
-) {
-    $this->abortIfKepalaBidang();
+        Request $request,
+        EmployeeScheduleService $scheduleService,
+        WorkCalendarService $calendarService
+    ) {
+        $this->abortIfKepalaBidang();
 
-    try {
+        try {
 
-        // =====================================================
-        // RANGE TANGGAL
-        // =====================================================
-        $startDate =
-            $request->start_date
-            ?: Attendance::min('date');
+            // =====================================================
+            // RANGE TANGGAL
+            // =====================================================
+            $startDate =
+                $request->start_date
+                ?: Attendance::min('date');
 
-        $endDate =
-            $request->end_date
-            ?: Attendance::max('date');
+            $endDate =
+                $request->end_date
+                ?: Attendance::max('date');
 
-        if (!$startDate || !$endDate) {
-            return DataTables::of([])
-                ->make(true);
-        }
+            if (!$startDate || !$endDate) {
+                return DataTables::of([])
+                    ->make(true);
+            }
 
-        $startDate =
-            \Carbon\Carbon::parse(
-                $startDate
-            )->startOfDay();
+            $startDate =
+                \Carbon\Carbon::parse(
+                    $startDate
+                )->startOfDay();
 
-        $endDate =
-            \Carbon\Carbon::parse(
-                $endDate
-            )->startOfDay();
+            $endDate =
+                \Carbon\Carbon::parse(
+                    $endDate
+                )->startOfDay();
 
-        // Jangan pernah menghitung tanggal masa depan
-        $today =
-            \Carbon\Carbon::today();
+            // Jangan pernah menghitung tanggal masa depan
+            $today =
+                \Carbon\Carbon::today();
 
-        if ($endDate->gt($today)) {
-            $endDate = $today;
-        }
+            if ($endDate->gt($today)) {
+                $endDate = $today;
+            }
 
-        if ($startDate->gt($endDate)) {
-            return DataTables::of([])
-                ->make(true);
-        }
+            if ($startDate->gt($endDate)) {
+                return DataTables::of([])
+                    ->make(true);
+            }
 
-        $startDateString =
-            $startDate->toDateString();
+            $startDateString =
+                $startDate->toDateString();
 
-        $endDateString =
-            $endDate->toDateString();
-
-
-        // =====================================================
-        // PERIOD DIBUAT SEKALI
-        // =====================================================
-        $period =
-            \Carbon\CarbonPeriod::create(
-                $startDate,
-                $endDate
-            )->toArray();
+            $endDateString =
+                $endDate->toDateString();
 
 
-        // =====================================================
-        // EMPLOYEE + SEMUA RELASI YANG DIPERLUKAN
-        // =====================================================
-        $employeesQuery =
-            Employee::with([
-                'workSchedule.days',
-                'employeeWorkSchedules.days',
-                'unitHistories.workSchedule.days',
-            ]);
+            // =====================================================
+            // PERIOD DIBUAT SEKALI
+            // =====================================================
+            $period =
+                \Carbon\CarbonPeriod::create(
+                    $startDate,
+                    $endDate
+                )->toArray();
 
 
-        // =====================================================
-        // FILTER UNIT BERDASARKAN PERIODE HISTORI
-        // =====================================================
-        $applyUnitPeriodFilter =
-            function (
-                $query,
-                $unitId
-            ) use (
-                $startDateString,
-                $endDateString
-            ) {
+            // =====================================================
+            // EMPLOYEE + SEMUA RELASI YANG DIPERLUKAN
+            // =====================================================
+            $employeesQuery =
+                Employee::with([
+                    'workSchedule.days',
+                    'employeeWorkSchedules.days',
+                    'unitHistories.workSchedule.days',
+                ]);
 
-                $query->where(function ($q) use (
-                    $unitId,
+
+            // =====================================================
+            // FILTER UNIT BERDASARKAN PERIODE HISTORI
+            // =====================================================
+            $applyUnitPeriodFilter =
+                function (
+                    $query,
+                    $unitId
+                ) use (
                     $startDateString,
                     $endDateString
                 ) {
 
-                    // Pegawai dengan histori unit
-                    $q->whereHas(
-                        'unitHistories',
-                        function ($history) use (
-                            $unitId,
-                            $startDateString,
-                            $endDateString
+                    $query->where(function ($q) use (
+                        $unitId,
+                        $startDateString,
+                        $endDateString
+                    ) {
+
+                        // Pegawai dengan histori unit
+                        $q->whereHas(
+                            'unitHistories',
+                            function ($history) use (
+                                $unitId,
+                                $startDateString,
+                                $endDateString
+                            ) {
+
+                                $history
+                                    ->where(
+                                        'unit_id',
+                                        $unitId
+                                    )
+                                    ->whereDate(
+                                        'tanggal_mulai',
+                                        '<=',
+                                        $endDateString
+                                    )
+                                    ->where(function ($period) use (
+                                        $startDateString
+                                    ) {
+
+                                        $period
+                                            ->whereNull(
+                                                'tanggal_selesai'
+                                            )
+                                            ->orWhereDate(
+                                                'tanggal_selesai',
+                                                '>=',
+                                                $startDateString
+                                            );
+                                    });
+                            }
+                        )
+
+                        // Pegawai lama tanpa histori
+                        ->orWhere(function ($legacy) use (
+                            $unitId
                         ) {
 
-                            $history
+                            $legacy
+                                ->whereDoesntHave(
+                                    'unitHistories'
+                                )
                                 ->where(
                                     'unit_id',
                                     $unitId
-                                )
-                                ->whereDate(
-                                    'tanggal_mulai',
-                                    '<=',
-                                    $endDateString
-                                )
-                                ->where(function ($period) use (
-                                    $startDateString
-                                ) {
+                                );
+                        });
+                    });
+                };
 
-                                    $period
-                                        ->whereNull(
-                                            'tanggal_selesai'
-                                        )
-                                        ->orWhereDate(
-                                            'tanggal_selesai',
-                                            '>=',
-                                            $startDateString
-                                        );
-                                });
-                        }
-                    )
 
-                    // Pegawai lama tanpa histori
-                    ->orWhere(function ($legacy) use (
-                        $unitId
+            // =====================================================
+            // SECURITY UNIT
+            // =====================================================
+            $user =
+                auth()->user();
+
+            $kepsekUnitId =
+                $this->getKepalaSekolahUnitId();
+
+            $isTU =
+                $user
+                && method_exists(
+                    $user,
+                    'isTU'
+                )
+                && $user->isTU();
+
+            $tuUnitId =
+                $isTU
+                    ? $user->unit_id
+                    : null;
+
+            if (
+                $isTU
+                &&
+                !$tuUnitId
+            ) {
+
+                abort(
+                    403,
+                    'Akun TU belum memiliki unit.'
+                );
+            }
+
+
+            // =====================================================
+            // UNIT TERKUNCI
+            // =====================================================
+            $lockedUnitId =
+                $isTU
+                    ? (int) $tuUnitId
+                    : (
+                        $kepsekUnitId !== null
+                            ? (int) $kepsekUnitId
+                            : null
+                    );
+
+
+            // =====================================================
+            // FILTER UNIT FINAL
+            // Hitung SEKALI saja
+            // =====================================================
+            $filterUnitId =
+                $lockedUnitId !== null
+                    ? $lockedUnitId
+                    : (
+                        $request->filled('unit_id')
+                            ? (int) $request->unit_id
+                            : null
+                    );
+
+
+            // =====================================================
+            // APPLY FILTER EMPLOYEE
+            // =====================================================
+            if ($filterUnitId !== null) {
+
+                $applyUnitPeriodFilter(
+                    $employeesQuery,
+                    $filterUnitId
+                );
+            }
+
+
+            $employees =
+                $employeesQuery->get();
+
+
+            // =====================================================
+            // ATTENDANCE
+            //
+            // Group langsung berdasarkan employee + tanggal
+            // =====================================================
+            $attendances =
+                Attendance::with([
+                    'activities'
+                ])
+                ->whereBetween(
+                    'date',
+                    [
+                        $startDateString,
+                        $endDateString
+                    ]
+                )
+                ->get()
+                ->groupBy(function ($item) {
+
+                    return
+                        $item->employee_id
+                        . '_'
+                        . \Carbon\Carbon::parse(
+                            $item->date
+                        )->toDateString();
+                });
+
+
+            // =====================================================
+            // IZIN APPROVED
+            // =====================================================
+            $allIzin =
+                AttendancePermission::where(
+                    'date_start',
+                    '<=',
+                    $endDateString
+                )
+                ->where(
+                    'date_end',
+                    '>=',
+                    $startDateString
+                )
+                ->where(
+                    'status',
+                    AttendancePermission::STATUS_APPROVED
+                )
+                ->get();
+
+
+            // =====================================================
+            // GROUP IZIN BERDASARKAN EMPLOYEE
+            //
+            // Supaya tidak filter seluruh izin setiap tanggal.
+            // =====================================================
+            $izinByEmployee =
+                $allIzin
+                    ->groupBy('employee_id');
+
+
+            // =====================================================
+            // CACHE
+            // =====================================================
+            $unitCache = [];
+
+            $scheduleCache = [];
+
+            $calendarCache = [];
+
+
+            $result = [];
+
+
+            // =====================================================
+            // LOOP EMPLOYEE
+            // =====================================================
+            foreach ($employees as $emp) {
+
+                $summary = [
+
+                    'total_hari_kerja' => 0,
+
+                    'hadir' => 0,
+
+                    'izin' => 0,
+
+                    'telat' => 0,
+
+                    'total_menit_telat' => 0,
+
+                    'pulang_cepat' => 0,
+
+                    'total_menit_pulang_cepat' => 0,
+
+                    'tanpa_keterangan' => 0,
+
+                    'keluar_tanpa_izin' => 0,
+
+                    'total_menit_keluar_tanpa_izin' => 0,
+
+                    'total_menit' => 0,
+
+                    'tidak_masuk' => 0,
+
+                    'hari_kerja_khusus' => 0,
+                ];
+
+
+                // =================================================
+                // LOOP TANGGAL
+                // =================================================
+                foreach ($period as $date) {
+
+                    $tanggal =
+                        $date->toDateString();
+
+
+                    // =================================================
+                    // MASA AKTIF PEGAWAI
+                    // =================================================
+                    if (
+                        $emp->tanggal_masuk
+                        &&
+                        $tanggal <
+                        $emp->tanggal_masuk->toDateString()
+                    ) {
+                        continue;
+                    }
+
+                    if (
+                        $emp->tanggal_keluar
+                        &&
+                        $tanggal >
+                        $emp->tanggal_keluar->toDateString()
+                    ) {
+                        continue;
+                    }
+
+
+                    // =================================================
+                    // UNIT PEGAWAI PADA TANGGAL
+                    // =================================================
+                    $unitCacheKey =
+                        $emp->id
+                        . '_'
+                        . $tanggal;
+
+                    if (
+                        !array_key_exists(
+                            $unitCacheKey,
+                            $unitCache
+                        )
                     ) {
 
-                        $legacy
-                            ->whereDoesntHave(
-                                'unitHistories'
-                            )
-                            ->where(
-                                'unit_id',
-                                $unitId
-                            );
-                    });
-                });
-            };
-
-
-        // =====================================================
-        // SECURITY UNIT
-        // =====================================================
-        $user =
-            auth()->user();
-
-        $kepsekUnitId =
-            $this->getKepalaSekolahUnitId();
-
-        $isTU =
-            $user
-            && method_exists(
-                $user,
-                'isTU'
-            )
-            && $user->isTU();
-
-        $tuUnitId =
-            $isTU
-                ? $user->unit_id
-                : null;
-
-        if (
-            $isTU
-            &&
-            !$tuUnitId
-        ) {
-
-            abort(
-                403,
-                'Akun TU belum memiliki unit.'
-            );
-        }
-
-
-        // =====================================================
-        // UNIT TERKUNCI
-        // =====================================================
-        $lockedUnitId =
-            $isTU
-                ? (int) $tuUnitId
-                : (
-                    $kepsekUnitId !== null
-                        ? (int) $kepsekUnitId
-                        : null
-                );
-
-
-        // =====================================================
-        // FILTER UNIT FINAL
-        // Hitung SEKALI saja
-        // =====================================================
-        $filterUnitId =
-            $lockedUnitId !== null
-                ? $lockedUnitId
-                : (
-                    $request->filled('unit_id')
-                        ? (int) $request->unit_id
-                        : null
-                );
-
-
-        // =====================================================
-        // APPLY FILTER EMPLOYEE
-        // =====================================================
-        if ($filterUnitId !== null) {
-
-            $applyUnitPeriodFilter(
-                $employeesQuery,
-                $filterUnitId
-            );
-        }
-
-
-        $employees =
-            $employeesQuery->get();
-
-
-        // =====================================================
-        // ATTENDANCE
-        //
-        // Group langsung berdasarkan employee + tanggal
-        // =====================================================
-        $attendances =
-            Attendance::with([
-                'activities'
-            ])
-            ->whereBetween(
-                'date',
-                [
-                    $startDateString,
-                    $endDateString
-                ]
-            )
-            ->get()
-            ->groupBy(function ($item) {
-
-                return
-                    $item->employee_id
-                    . '_'
-                    . \Carbon\Carbon::parse(
-                        $item->date
-                    )->toDateString();
-            });
-
-
-        // =====================================================
-        // IZIN APPROVED
-        // =====================================================
-        $allIzin =
-            AttendancePermission::where(
-                'date_start',
-                '<=',
-                $endDateString
-            )
-            ->where(
-                'date_end',
-                '>=',
-                $startDateString
-            )
-            ->where(
-                'status',
-                AttendancePermission::STATUS_APPROVED
-            )
-            ->get();
-
-
-        // =====================================================
-        // GROUP IZIN BERDASARKAN EMPLOYEE
-        //
-        // Supaya tidak filter seluruh izin setiap tanggal.
-        // =====================================================
-        $izinByEmployee =
-            $allIzin
-                ->groupBy('employee_id');
-
-
-        // =====================================================
-        // CACHE
-        // =====================================================
-        $unitCache = [];
-
-        $scheduleCache = [];
-
-        $calendarCache = [];
-
-
-        $result = [];
-
-
-        // =====================================================
-        // LOOP EMPLOYEE
-        // =====================================================
-        foreach ($employees as $emp) {
-
-            $summary = [
-
-                'total_hari_kerja' => 0,
-
-                'hadir' => 0,
-
-                'izin' => 0,
-
-                'telat' => 0,
-
-                'total_menit_telat' => 0,
-
-                'pulang_cepat' => 0,
-
-                'total_menit_pulang_cepat' => 0,
-
-                'tanpa_keterangan' => 0,
-
-                'keluar_tanpa_izin' => 0,
-
-                'total_menit_keluar_tanpa_izin' => 0,
-
-                'total_menit' => 0,
-
-                'tidak_masuk' => 0,
-
-                'hari_kerja_khusus' => 0,
-            ];
-
-
-            // =================================================
-            // LOOP TANGGAL
-            // =================================================
-            foreach ($period as $date) {
-
-                $tanggal =
-                    $date->toDateString();
-
-
-                // =================================================
-                // MASA AKTIF PEGAWAI
-                // =================================================
-                if (
-                    $emp->tanggal_masuk
-                    &&
-                    $tanggal <
-                    $emp->tanggal_masuk->toDateString()
-                ) {
-                    continue;
-                }
-
-                if (
-                    $emp->tanggal_keluar
-                    &&
-                    $tanggal >
-                    $emp->tanggal_keluar->toDateString()
-                ) {
-                    continue;
-                }
-
-
-                // =================================================
-                // UNIT PEGAWAI PADA TANGGAL
-                // =================================================
-                $unitCacheKey =
-                    $emp->id
-                    . '_'
-                    . $tanggal;
-
-                if (
-                    !array_key_exists(
-                        $unitCacheKey,
-                        $unitCache
-                    )
-                ) {
-
-                    $history =
-                        $emp->unitHistories
-                            ->filter(
-                                function ($history) use (
-                                    $tanggal
-                                ) {
-
-                                    return
-                                        $history
-                                            ->tanggal_mulai
-                                            ->toDateString()
-                                        <=
+                        $history =
+                            $emp->unitHistories
+                                ->filter(
+                                    function ($history) use (
                                         $tanggal
+                                    ) {
 
-                                        &&
+                                        return
+                                            $history
+                                                ->tanggal_mulai
+                                                ->toDateString()
+                                            <=
+                                            $tanggal
 
-                                        (
-                                            is_null(
+                                            &&
+
+                                            (
+                                                is_null(
+                                                    $history
+                                                        ->tanggal_selesai
+                                                )
+
+                                                ||
+
                                                 $history
                                                     ->tanggal_selesai
-                                            )
-
-                                            ||
-
-                                            $history
-                                                ->tanggal_selesai
-                                                ->toDateString()
-                                            >=
-                                            $tanggal
-                                        );
-                                }
-                            )
-                            ->sortByDesc(
-                                'tanggal_mulai'
-                            )
-                            ->first();
+                                                    ->toDateString()
+                                                >=
+                                                $tanggal
+                                            );
+                                    }
+                                )
+                                ->sortByDesc(
+                                    'tanggal_mulai'
+                                )
+                                ->first();
 
 
-                    $unitCache[
-                        $unitCacheKey
-                    ] =
-                        $history
-                            ? (int) $history->unit_id
-                            : (
-                                $emp->unit_id
-                                    ? (int) $emp->unit_id
-                                    : null
+                        $unitCache[
+                            $unitCacheKey
+                        ] =
+                            $history
+                                ? (int) $history->unit_id
+                                : (
+                                    $emp->unit_id
+                                        ? (int) $emp->unit_id
+                                        : null
+                                );
+                    }
+
+
+                    $unitIdPadaTanggal =
+                        $unitCache[
+                            $unitCacheKey
+                        ];
+
+
+                    // =================================================
+                    // FILTER UNIT PER TANGGAL
+                    // =================================================
+                    if (
+                        $filterUnitId !== null
+                        &&
+                        (int) $unitIdPadaTanggal
+                        !== (int) $filterUnitId
+                    ) {
+                        continue;
+                    }
+
+
+                    // =================================================
+                    // KALDIK
+                    // =================================================
+                    $calendarCacheKey =
+                        ($unitIdPadaTanggal ?: 0)
+                        . '_'
+                        . $tanggal;
+
+
+                    if (
+                        !array_key_exists(
+                            $calendarCacheKey,
+                            $calendarCache
+                        )
+                    ) {
+
+                        $calendarCache[
+                            $calendarCacheKey
+                        ] =
+                            $calendarService->getCalendar(
+                                $tanggal,
+                                $unitIdPadaTanggal
                             );
-                }
+                    }
 
 
-                $unitIdPadaTanggal =
-                    $unitCache[
-                        $unitCacheKey
-                    ];
+                    $calendar =
+                        $calendarCache[
+                            $calendarCacheKey
+                        ];
 
 
-                // =================================================
-                // FILTER UNIT PER TANGGAL
-                // =================================================
-                if (
-                    $filterUnitId !== null
-                    &&
-                    (int) $unitIdPadaTanggal
-                    !== (int) $filterUnitId
-                ) {
-                    continue;
-                }
-
-
-                // =================================================
-                // KALDIK
-                // =================================================
-                $calendarCacheKey =
-                    ($unitIdPadaTanggal ?: 0)
-                    . '_'
-                    . $tanggal;
-
-
-                if (
-                    !array_key_exists(
-                        $calendarCacheKey,
-                        $calendarCache
-                    )
-                ) {
-
-                    $calendarCache[
-                        $calendarCacheKey
-                    ] =
-                        $calendarService->getCalendar(
-                            $tanggal,
-                            $unitIdPadaTanggal
-                        );
-                }
-
-
-                $calendar =
-                    $calendarCache[
-                        $calendarCacheKey
-                    ];
-
-
-                // =================================================
-                // JADWAL
-                // =================================================
-                $scheduleCacheKey =
-                    $emp->id
-                    . '_'
-                    . $tanggal;
-
-
-                if (
-                    !array_key_exists(
-                        $scheduleCacheKey,
-                        $scheduleCache
-                    )
-                ) {
-
-                    $scheduleCache[
-                        $scheduleCacheKey
-                    ] =
-                        $scheduleService->getSchedule(
-                            $emp,
-                            $tanggal
-                        );
-                }
-
-
-                $jadwal =
-                    $scheduleCache[
-                        $scheduleCacheKey
-                    ];
-
-
-                // =================================================
-                // BUKAN HARI KERJA
-                // =================================================
-                if (!$jadwal) {
-                    continue;
-                }
-
-
-                // =================================================
-                // HARI KERJA KHUSUS
-                // =================================================
-                $isHariKerjaKhusus =
-                    $calendar
-                    &&
-                    (bool) $calendar->is_workday
-                    &&
-                    $calendar->type
-                        === 'hari_kerja_khusus';
-
-
-                // =================================================
-                // TOTAL HARI KERJA
-                // =================================================
-                $summary[
-                    'total_hari_kerja'
-                ]++;
-
-
-                // =================================================
-                // ATTENDANCE
-                // =================================================
-                $key =
-                    $emp->id
-                    . '_'
-                    . $tanggal;
-
-                $att =
-                    $attendances
-                        ->get($key)
-                        ?->first();
-
-
-                // =================================================
-                // IZIN HARI INI
-                //
-                // Hanya ambil izin milik employee ini.
-                // =================================================
-                $izinHari =
-                    ($izinByEmployee->get(
+                    // =================================================
+                    // JADWAL
+                    // =================================================
+                    $scheduleCacheKey =
                         $emp->id
-                    ) ?? collect())
-                    ->filter(
-                        function ($izin) use (
-                            $tanggal
-                        ) {
-
-                            return
-                                $tanggal
-                                    >=
-                                    \Carbon\Carbon::parse(
-                                        $izin->date_start
-                                    )->toDateString()
-
-                                &&
-
-                                $tanggal
-                                    <=
-                                    \Carbon\Carbon::parse(
-                                        $izin->date_end
-                                    )->toDateString();
-                        }
-                    )
-                    ->values();
-
-
-                $izinCount =
-                    $izinHari->count();
-
-
-                // =================================================
-                // TIDAK ADA ABSENSI
-                // =================================================
-                if (!$att) {
-
-                    if ($isHariKerjaKhusus) {
-
-                        $summary['hadir']++;
-
-                        $summary[
-                            'hari_kerja_khusus'
-                        ]++;
-
-                    } elseif ($izinCount > 0) {
-
-                        $summary[
-                            'tidak_masuk'
-                        ]++;
-
-                        $summary[
-                            'izin'
-                        ]++;
-
-                    } else {
-
-                        $summary[
-                            'tidak_masuk'
-                        ]++;
-
-                        $summary[
-                            'tanpa_keterangan'
-                        ]++;
-                    }
-
-                    continue;
-                }
-
-
-                // =================================================
-                // ADA ABSENSI
-                // =================================================
-                $summary['hadir']++;
-
-
-                $jamMasuk =
-                    $att->check_in;
-
-                $jamPulang =
-                    $att->check_out;
-
-
-                $masukFix =
-                    $jamMasuk
-                        ? \Carbon\Carbon::parse(
-                            $tanggal
-                            . ' '
-                            . $jamMasuk
-                        )
-                        : null;
-
-
-                $pulangFix =
-                    $jamPulang
-                        ? \Carbon\Carbon::parse(
-                            $tanggal
-                            . ' '
-                            . $jamPulang
-                        )
-                        : null;
-
-
-                // =================================================
-                // JAM STANDAR
-                // =================================================
-                $jamMasukStandar =
-                    $jadwal['jam_masuk']
-                    ?? null;
-
-                $jamPulangStandar =
-                    $jadwal['jam_pulang']
-                    ?? null;
-
-
-                if (
-                    !$jamMasukStandar
-                    ||
-                    !$jamPulangStandar
-                ) {
-                    continue;
-                }
-
-
-                $standarMasuk =
-                    \Carbon\Carbon::parse(
-                        $tanggal
-                        . ' '
-                        . $jamMasukStandar
-                    );
-
-
-                $standarPulang =
-                    \Carbon\Carbon::parse(
-                        $tanggal
-                        . ' '
-                        . $jamPulangStandar
-                    );
-
-
-                // =================================================
-                // IZIN TERLAMBAT
-                // =================================================
-                $izinTerlambat =
-                    $izinHari->first(
-                        function ($permission) {
-
-                            return
-                                $permission->type
-                                    === 'Izin Terlambat'
-                                &&
-                                $permission->time_start;
-                        }
-                    );
-
-
-                // =================================================
-                // TERLAMBAT
-                // =================================================
-                if (
-                    $masukFix
-                    &&
-                    $masukFix->gt(
-                        $standarMasuk
-                    )
-                ) {
-
-                    $telat = true;
-
-                    $menitTelat =
-                        (int) $standarMasuk
-                            ->diffInMinutes(
-                                $masukFix
-                            );
-
-
-                    if ($izinTerlambat) {
-
-                        $jamIzinDatang =
-                            \Carbon\Carbon::parse(
-                                $tanggal
-                                . ' '
-                                . $izinTerlambat
-                                    ->time_start
-                            );
-
-
-                        $batasIzinDatang =
-                            $jamIzinDatang
-                                ->copy()
-                                ->addMinutes(5);
-
-
-                        if (
-                            $masukFix->lte(
-                                $batasIzinDatang
-                            )
-                        ) {
-
-                            $telat = false;
-
-                            $menitTelat = 0;
-
-                        } else {
-
-                            $menitTelat =
-                                (int) $jamIzinDatang
-                                    ->diffInMinutes(
-                                        $masukFix
-                                    );
-                        }
-                    }
+                        . '_'
+                        . $tanggal;
 
 
                     if (
-                        $telat
-                        &&
-                        $menitTelat > 0
+                        !array_key_exists(
+                            $scheduleCacheKey,
+                            $scheduleCache
+                        )
                     ) {
 
-                        $summary['telat']++;
-
-                        $summary[
-                            'total_menit_telat'
-                        ] +=
-                            $menitTelat;
-                    }
-                }
-
-
-                // =================================================
-                // IZIN PULANG AWAL
-                // =================================================
-                $izinPulangAwal =
-                    $izinHari->first(
-                        function ($permission) {
-
-                            return
-                                $permission->type
-                                    === 'Izin Pulang Awal'
-                                &&
-                                $permission->time_start;
-                        }
-                    );
-
-
-                // =================================================
-                // PULANG CEPAT
-                // =================================================
-                if (
-                    $pulangFix
-                    &&
-                    $pulangFix->lt(
-                        $standarPulang
-                    )
-                ) {
-
-                    $pulangCepat = true;
-
-                    $menitPulangCepat =
-                        (int) $pulangFix
-                            ->diffInMinutes(
-                                $standarPulang
-                            );
-
-
-                    if ($izinPulangAwal) {
-
-                        $jamIzinPulang =
-                            \Carbon\Carbon::parse(
+                        $scheduleCache[
+                            $scheduleCacheKey
+                        ] =
+                            $scheduleService->getSchedule(
+                                $emp,
                                 $tanggal
-                                . ' '
-                                . $izinPulangAwal
-                                    ->time_start
                             );
-
-
-                        $batasIzinPulang =
-                            $jamIzinPulang
-                                ->copy()
-                                ->subMinutes(5);
-
-
-                        if (
-                            $pulangFix->gte(
-                                $batasIzinPulang
-                            )
-                        ) {
-
-                            $pulangCepat = false;
-
-                            $menitPulangCepat = 0;
-
-                        } else {
-
-                            $menitPulangCepat =
-                                (int) $pulangFix
-                                    ->diffInMinutes(
-                                        $jamIzinPulang
-                                    );
-                        }
                     }
 
 
-                    if (
-                        $pulangCepat
+                    $jadwal =
+                        $scheduleCache[
+                            $scheduleCacheKey
+                        ];
+
+
+                    // =================================================
+                    // BUKAN HARI KERJA
+                    // =================================================
+                    if (!$jadwal) {
+                        continue;
+                    }
+
+
+                    // =================================================
+                    // HARI KERJA KHUSUS
+                    // =================================================
+                    $isHariKerjaKhusus =
+                        $calendar
                         &&
-                        $menitPulangCepat > 0
-                    ) {
-
-                        $summary[
-                            'pulang_cepat'
-                        ]++;
-
-                        $summary[
-                            'total_menit_pulang_cepat'
-                        ] +=
-                            $menitPulangCepat;
-                    }
-                }
+                        (bool) $calendar->is_workday
+                        &&
+                        $calendar->type
+                            === 'hari_kerja_khusus';
 
 
-                // =================================================
-                // IZIN
-                // =================================================
-                if ($izinCount > 0) {
-                    $summary['izin']++;
-                }
+                    // =================================================
+                    // TOTAL HARI KERJA
+                    // =================================================
+                    $summary[
+                        'total_hari_kerja'
+                    ]++;
 
 
-                // =================================================
-                // ACTIVITIES
-                // =================================================
-                $activities =
-                    $att->activities
-                        ->sortBy('time')
+                    // =================================================
+                    // ATTENDANCE
+                    // =================================================
+                    $key =
+                        $emp->id
+                        . '_'
+                        . $tanggal;
+
+                    $att =
+                        $attendances
+                            ->get($key)
+                            ?->first();
+
+
+                    // =================================================
+                    // IZIN HARI INI
+                    //
+                    // Hanya ambil izin milik employee ini.
+                    // =================================================
+                    $izinHari =
+                        ($izinByEmployee->get(
+                            $emp->id
+                        ) ?? collect())
+                        ->filter(
+                            function ($izin) use (
+                                $tanggal
+                            ) {
+
+                                return
+                                    $tanggal
+                                        >=
+                                        \Carbon\Carbon::parse(
+                                            $izin->date_start
+                                        )->toDateString()
+
+                                    &&
+
+                                    $tanggal
+                                        <=
+                                        \Carbon\Carbon::parse(
+                                            $izin->date_end
+                                        )->toDateString();
+                            }
+                        )
                         ->values();
 
 
-                // =================================================
-                // KELUAR TANPA IZIN
-                // =================================================
-                for (
-                    $i = 0;
-                    $i < $activities->count() - 1;
-                    $i++
-                ) {
+                    $izinCount =
+                        $izinHari->count();
 
-                    $current =
-                        $activities[$i];
 
-                    $next =
-                        $activities[$i + 1];
+                    // =================================================
+                    // TIDAK ADA ABSENSI
+                    // =================================================
+                    if (!$att) {
+
+                        if ($isHariKerjaKhusus) {
+
+                            $summary['hadir']++;
+
+                            $summary[
+                                'hari_kerja_khusus'
+                            ]++;
+
+                        } elseif ($izinCount > 0) {
+
+                            $summary[
+                                'tidak_masuk'
+                            ]++;
+
+                            $summary[
+                                'izin'
+                            ]++;
+
+                        } else {
+
+                            $summary[
+                                'tidak_masuk'
+                            ]++;
+
+                            $summary[
+                                'tanpa_keterangan'
+                            ]++;
+                        }
+
+                        continue;
+                    }
+
+
+                    // =================================================
+                    // ADA ABSENSI
+                    // =================================================
+                    $summary['hadir']++;
+
+
+                    $jamMasuk =
+                        $att->check_in;
+
+                    $jamPulang =
+                        $att->check_out;
+
+
+                    $masukFix =
+                        $jamMasuk
+                            ? \Carbon\Carbon::parse(
+                                $tanggal
+                                . ' '
+                                . $jamMasuk
+                            )
+                            : null;
+
+
+                    $pulangFix =
+                        $jamPulang
+                            ? \Carbon\Carbon::parse(
+                                $tanggal
+                                . ' '
+                                . $jamPulang
+                            )
+                            : null;
+
+
+                    // =================================================
+                    // JAM STANDAR
+                    // =================================================
+                    $jamMasukStandar =
+                        $jadwal['jam_masuk']
+                        ?? null;
+
+                    $jamPulangStandar =
+                        $jadwal['jam_pulang']
+                        ?? null;
 
 
                     if (
-                        $current->type !== 'out'
+                        !$jamMasukStandar
                         ||
-                        $next->type !== 'in'
+                        !$jamPulangStandar
                     ) {
                         continue;
                     }
 
 
-                    $jamKeluar =
+                    $standarMasuk =
                         \Carbon\Carbon::parse(
                             $tanggal
                             . ' '
-                            . $current->time
+                            . $jamMasukStandar
                         );
 
 
-                    $jamKembali =
+                    $standarPulang =
                         \Carbon\Carbon::parse(
                             $tanggal
                             . ' '
-                            . $next->time
+                            . $jamPulangStandar
                         );
 
 
-                    if (
-                        $jamKeluar->lt(
-                            $standarMasuk
-                        )
-                        ||
-                        $jamKeluar->gte(
-                            $standarPulang
-                        )
-                    ) {
-                        continue;
-                    }
-
-
-                    $adaIzin =
-                        $izinHari->contains(
-                            function (
-                                $permission
-                            ) use (
-                                $tanggal,
-                                $jamKeluar,
-                                $jamKembali
-                            ) {
-
-                                if (
-                                    !$permission->time_start
-                                    ||
-                                    !$permission->time_end
-                                ) {
-                                    return false;
-                                }
-
-
-                                $izinMulai =
-                                    \Carbon\Carbon::parse(
-                                        $tanggal
-                                        . ' '
-                                        . $permission
-                                            ->time_start
-                                    );
-
-
-                                $izinSelesai =
-                                    \Carbon\Carbon::parse(
-                                        $tanggal
-                                        . ' '
-                                        . $permission
-                                            ->time_end
-                                    );
-
+                    // =================================================
+                    // IZIN TERLAMBAT
+                    // =================================================
+                    $izinTerlambat =
+                        $izinHari->first(
+                            function ($permission) {
 
                                 return
-                                    $izinMulai->lte(
-                                        $jamKeluar
-                                    )
+                                    $permission->type
+                                        === 'Izin Terlambat'
                                     &&
-                                    $izinSelesai->gte(
-                                        $jamKembali
-                                    );
+                                    $permission->time_start;
                             }
                         );
 
 
-                    if (!$adaIzin) {
+                    // =================================================
+                    // TERLAMBAT
+                    // =================================================
+                    if (
+                        $masukFix
+                        &&
+                        $masukFix->gt(
+                            $standarMasuk
+                        )
+                    ) {
 
-                        $summary[
-                            'keluar_tanpa_izin'
-                        ]++;
+                        $telat = true;
+
+                        $menitTelat =
+                            (int) $standarMasuk
+                                ->diffInMinutes(
+                                    $masukFix
+                                );
+
+
+                        if ($izinTerlambat) {
+
+                            $jamIzinDatang =
+                                \Carbon\Carbon::parse(
+                                    $tanggal
+                                    . ' '
+                                    . $izinTerlambat
+                                        ->time_start
+                                );
+
+
+                            $batasIzinDatang =
+                                $jamIzinDatang
+                                    ->copy()
+                                    ->addMinutes(5);
+
+
+                            if (
+                                $masukFix->lte(
+                                    $batasIzinDatang
+                                )
+                            ) {
+
+                                $telat = false;
+
+                                $menitTelat = 0;
+
+                            } else {
+
+                                $menitTelat =
+                                    (int) $jamIzinDatang
+                                        ->diffInMinutes(
+                                            $masukFix
+                                        );
+                            }
+                        }
 
 
                         if (
-                            $jamKembali->gt(
-                                $jamKeluar
-                            )
+                            $telat
+                            &&
+                            $menitTelat > 0
+                        ) {
+
+                            $summary['telat']++;
+
+                            $summary[
+                                'total_menit_telat'
+                            ] +=
+                                $menitTelat;
+                        }
+                    }
+
+
+                    // =================================================
+                    // IZIN PULANG AWAL
+                    // =================================================
+                    $izinPulangAwal =
+                        $izinHari->first(
+                            function ($permission) {
+
+                                return
+                                    $permission->type
+                                        === 'Izin Pulang Awal'
+                                    &&
+                                    $permission->time_start;
+                            }
+                        );
+
+
+                    // =================================================
+                    // PULANG CEPAT
+                    // =================================================
+                    if (
+                        $pulangFix
+                        &&
+                        $pulangFix->lt(
+                            $standarPulang
+                        )
+                    ) {
+
+                        $pulangCepat = true;
+
+                        $menitPulangCepat =
+                            (int) $pulangFix
+                                ->diffInMinutes(
+                                    $standarPulang
+                                );
+
+
+                        if ($izinPulangAwal) {
+
+                            $jamIzinPulang =
+                                \Carbon\Carbon::parse(
+                                    $tanggal
+                                    . ' '
+                                    . $izinPulangAwal
+                                        ->time_start
+                                );
+
+
+                            $batasIzinPulang =
+                                $jamIzinPulang
+                                    ->copy()
+                                    ->subMinutes(5);
+
+
+                            if (
+                                $pulangFix->gte(
+                                    $batasIzinPulang
+                                )
+                            ) {
+
+                                $pulangCepat = false;
+
+                                $menitPulangCepat = 0;
+
+                            } else {
+
+                                $menitPulangCepat =
+                                    (int) $pulangFix
+                                        ->diffInMinutes(
+                                            $jamIzinPulang
+                                        );
+                            }
+                        }
+
+
+                        if (
+                            $pulangCepat
+                            &&
+                            $menitPulangCepat > 0
                         ) {
 
                             $summary[
-                                'total_menit_keluar_tanpa_izin'
+                                'pulang_cepat'
+                            ]++;
+
+                            $summary[
+                                'total_menit_pulang_cepat'
                             ] +=
-                                (int)
-                                $jamKeluar
-                                    ->diffInMinutes(
-                                        $jamKembali
-                                    );
+                                $menitPulangCepat;
                         }
                     }
-                }
 
 
-                // =================================================
-                // TOTAL JAM KERJA AKTUAL
-                // =================================================
-                if (
-                    $masukFix
-                    &&
-                    $pulangFix
-                    &&
-                    $pulangFix->gt(
-                        $masukFix
-                    )
-                ) {
-
-                    $totalMenit =
-                        (int) $masukFix
-                            ->diffInMinutes(
-                                $pulangFix
-                            );
+                    // =================================================
+                    // IZIN
+                    // =================================================
+                    if ($izinCount > 0) {
+                        $summary['izin']++;
+                    }
 
 
-                    $totalMenitKeluar = 0;
+                    // =================================================
+                    // ACTIVITIES
+                    // =================================================
+                    $activities =
+                        $att->activities
+                            ->sortBy('time')
+                            ->values();
 
 
+                    // =================================================
+                    // KELUAR TANPA IZIN
+                    // =================================================
                     for (
                         $i = 0;
                         $i < $activities->count() - 1;
@@ -1240,7 +1091,7 @@ class AbsensiController extends Controller
                         }
 
 
-                        $keluar =
+                        $jamKeluar =
                             \Carbon\Carbon::parse(
                                 $tanggal
                                 . ' '
@@ -1248,7 +1099,7 @@ class AbsensiController extends Controller
                             );
 
 
-                        $kembali =
+                        $jamKembali =
                             \Carbon\Carbon::parse(
                                 $tanggal
                                 . ' '
@@ -1257,155 +1108,304 @@ class AbsensiController extends Controller
 
 
                         if (
-                            $kembali->gt(
-                                $keluar
+                            $jamKeluar->lt(
+                                $standarMasuk
+                            )
+                            ||
+                            $jamKeluar->gte(
+                                $standarPulang
                             )
                         ) {
+                            continue;
+                        }
 
-                            $totalMenitKeluar +=
-                                (int)
-                                $keluar
-                                    ->diffInMinutes(
-                                        $kembali
-                                    );
+
+                        $adaIzin =
+                            $izinHari->contains(
+                                function (
+                                    $permission
+                                ) use (
+                                    $tanggal,
+                                    $jamKeluar,
+                                    $jamKembali
+                                ) {
+
+                                    if (
+                                        !$permission->time_start
+                                        ||
+                                        !$permission->time_end
+                                    ) {
+                                        return false;
+                                    }
+
+
+                                    $izinMulai =
+                                        \Carbon\Carbon::parse(
+                                            $tanggal
+                                            . ' '
+                                            . $permission
+                                                ->time_start
+                                        );
+
+
+                                    $izinSelesai =
+                                        \Carbon\Carbon::parse(
+                                            $tanggal
+                                            . ' '
+                                            . $permission
+                                                ->time_end
+                                        );
+
+
+                                    return
+                                        $izinMulai->lte(
+                                            $jamKeluar
+                                        )
+                                        &&
+                                        $izinSelesai->gte(
+                                            $jamKembali
+                                        );
+                                }
+                            );
+
+
+                        if (!$adaIzin) {
+
+                            $summary[
+                                'keluar_tanpa_izin'
+                            ]++;
+
+
+                            if (
+                                $jamKembali->gt(
+                                    $jamKeluar
+                                )
+                            ) {
+
+                                $summary[
+                                    'total_menit_keluar_tanpa_izin'
+                                ] +=
+                                    (int)
+                                    $jamKeluar
+                                        ->diffInMinutes(
+                                            $jamKembali
+                                        );
+                            }
                         }
                     }
 
 
-                    $menitKerjaAktual =
-                        max(
-                            0,
-                            $totalMenit
-                            - $totalMenitKeluar
-                        );
+                    // =================================================
+                    // TOTAL JAM KERJA AKTUAL
+                    // =================================================
+                    if (
+                        $masukFix
+                        &&
+                        $pulangFix
+                        &&
+                        $pulangFix->gt(
+                            $masukFix
+                        )
+                    ) {
+
+                        $totalMenit =
+                            (int) $masukFix
+                                ->diffInMinutes(
+                                    $pulangFix
+                                );
 
 
-                    $summary[
-                        'total_menit'
-                    ] +=
-                        $menitKerjaAktual;
+                        $totalMenitKeluar = 0;
+
+
+                        for (
+                            $i = 0;
+                            $i < $activities->count() - 1;
+                            $i++
+                        ) {
+
+                            $current =
+                                $activities[$i];
+
+                            $next =
+                                $activities[$i + 1];
+
+
+                            if (
+                                $current->type !== 'out'
+                                ||
+                                $next->type !== 'in'
+                            ) {
+                                continue;
+                            }
+
+
+                            $keluar =
+                                \Carbon\Carbon::parse(
+                                    $tanggal
+                                    . ' '
+                                    . $current->time
+                                );
+
+
+                            $kembali =
+                                \Carbon\Carbon::parse(
+                                    $tanggal
+                                    . ' '
+                                    . $next->time
+                                );
+
+
+                            if (
+                                $kembali->gt(
+                                    $keluar
+                                )
+                            ) {
+
+                                $totalMenitKeluar +=
+                                    (int)
+                                    $keluar
+                                        ->diffInMinutes(
+                                            $kembali
+                                        );
+                            }
+                        }
+
+
+                        $menitKerjaAktual =
+                            max(
+                                0,
+                                $totalMenit
+                                - $totalMenitKeluar
+                            );
+
+
+                        $summary[
+                            'total_menit'
+                        ] +=
+                            $menitKerjaAktual;
+                    }
                 }
+
+
+                // =====================================================
+                // RESULT
+                // =====================================================
+                $result[] = [
+
+                    'nama' =>
+                        $emp->nama,
+
+                    'total_hari_kerja' =>
+                        $summary[
+                            'total_hari_kerja'
+                        ],
+
+                    'izin' =>
+                        $summary['izin'],
+
+                    'total_hadir' =>
+                        $summary['hadir'],
+
+                    'tidak_masuk' =>
+                        $summary[
+                            'tidak_masuk'
+                        ],
+
+                    'total_telat' =>
+                        $summary['telat'],
+
+                    'total_menit_telat' =>
+                        $summary[
+                            'total_menit_telat'
+                        ],
+
+                    'pulang_cepat' =>
+                        $summary[
+                            'pulang_cepat'
+                        ],
+
+                    'total_menit_pulang_cepat' =>
+                        $summary[
+                            'total_menit_pulang_cepat'
+                        ],
+
+                    'tanpa_keterangan' =>
+                        $summary[
+                            'tanpa_keterangan'
+                        ],
+
+                    'keluar_tanpa_izin' =>
+                        $summary[
+                            'keluar_tanpa_izin'
+                        ],
+
+                    'menit_keluar_tanpa_izin' =>
+                        $summary[
+                            'total_menit_keluar_tanpa_izin'
+                        ],
+
+                    'aksi' =>
+                        route(
+                            'absensi.detailRange',
+                            [
+                                'employee' =>
+                                    $emp->id,
+
+                                'start' =>
+                                    $startDateString,
+
+                                'end' =>
+                                    $endDateString,
+                            ]
+                        ),
+                ];
             }
 
 
             // =====================================================
-            // RESULT
+            // DATATABLE
             // =====================================================
-            $result[] = [
+            return DataTables::of(
+                    $result
+                )
+                ->addColumn(
+                    'aksi',
+                    function ($row) {
 
-                'nama' =>
-                    $emp->nama,
+                        return
+                            '<a href="'
+                            . $row['aksi']
+                            . '" class="btn btn-info btn-sm">'
+                            . 'Detail'
+                            . '</a>';
+                    }
+                )
+                ->rawColumns([
+                    'aksi'
+                ])
+                ->make(true);
 
-                'total_hari_kerja' =>
-                    $summary[
-                        'total_hari_kerja'
-                    ],
 
-                'izin' =>
-                    $summary['izin'],
+        } catch (\Throwable $e) {
 
-                'total_hadir' =>
-                    $summary['hadir'],
+            return response()->json([
 
-                'tidak_masuk' =>
-                    $summary[
-                        'tidak_masuk'
-                    ],
+                'error' =>
+                    true,
 
-                'total_telat' =>
-                    $summary['telat'],
+                'message' =>
+                    $e->getMessage(),
 
-                'total_menit_telat' =>
-                    $summary[
-                        'total_menit_telat'
-                    ],
+                'line' =>
+                    $e->getLine(),
 
-                'pulang_cepat' =>
-                    $summary[
-                        'pulang_cepat'
-                    ],
+                'file' =>
+                    $e->getFile(),
 
-                'total_menit_pulang_cepat' =>
-                    $summary[
-                        'total_menit_pulang_cepat'
-                    ],
-
-                'tanpa_keterangan' =>
-                    $summary[
-                        'tanpa_keterangan'
-                    ],
-
-                'keluar_tanpa_izin' =>
-                    $summary[
-                        'keluar_tanpa_izin'
-                    ],
-
-                'menit_keluar_tanpa_izin' =>
-                    $summary[
-                        'total_menit_keluar_tanpa_izin'
-                    ],
-
-                'aksi' =>
-                    route(
-                        'absensi.detailRange',
-                        [
-                            'employee' =>
-                                $emp->id,
-
-                            'start' =>
-                                $startDateString,
-
-                            'end' =>
-                                $endDateString,
-                        ]
-                    ),
-            ];
+            ], 500);
         }
-
-
-        // =====================================================
-        // DATATABLE
-        // =====================================================
-        return DataTables::of(
-                $result
-            )
-            ->addColumn(
-                'aksi',
-                function ($row) {
-
-                    return
-                        '<a href="'
-                        . $row['aksi']
-                        . '" class="btn btn-info btn-sm">'
-                        . 'Detail'
-                        . '</a>';
-                }
-            )
-            ->rawColumns([
-                'aksi'
-            ])
-            ->make(true);
-
-
-    } catch (\Throwable $e) {
-
-        return response()->json([
-
-            'error' =>
-                true,
-
-            'message' =>
-                $e->getMessage(),
-
-            'line' =>
-                $e->getLine(),
-
-            'file' =>
-                $e->getFile(),
-
-        ], 500);
     }
-}
 
 
     public function index()
@@ -1541,6 +1541,26 @@ class AbsensiController extends Controller
             'workSchedule.days',
             'employeeWorkSchedules.days'
         ])->findOrFail($employeeId);
+
+        // =====================================================
+        // KHUSUS TK TAMA
+        // =====================================================
+        $isTkTama =
+            $employee->unit
+            &&
+            (
+                str_contains(
+                    strtolower((string) $employee->unit->nama),
+                    'tama'
+                )
+                ||
+                str_contains(
+                    strtolower((string) ($employee->unit->code ?? '')),
+                    'tama'
+                )
+                ||
+                strtolower((string) ($employee->unit->code ?? '')) === 'tm'
+            );
 
         // =====================================================
         // SECURITY UNIT
@@ -2422,15 +2442,21 @@ class AbsensiController extends Controller
                 // =================================================
                 // KELUAR TENGAH JAM KERJA
                 //
-                // Cari pasangan:
-                //
+                // NORMAL:
                 // OUT → IN
+                //
+                // KHUSUS TK TAMA:
+                // OUT → OUT
+                //
+                // Artinya scan OUT pertama dianggap keluar
+                // dan scan OUT kedua dianggap checkout akhir.
+                //
+                // Hanya TK Tama yang memakai rule OUT → OUT.
                 // =================================================
                 $activities =
                     $att->activities
                         ->sortBy('time')
                         ->values();
-
 
                 for (
                     $i = 0;
@@ -2445,34 +2471,66 @@ class AbsensiController extends Controller
                         $activities[$i + 1];
 
 
-                    // =============================================
-                    // HANYA OUT → IN
-                    // =============================================
+                    // =================================================
+                    // RULE 1
+                    // OUT → IN
+                    //
+                    // Tetap berlaku untuk SEMUA unit.
+                    // =================================================
+                    $isOutIn =
+                        $current->type === 'out'
+                        &&
+                        $next->type === 'in';
+
+
+                    // =================================================
+                    // RULE 2
+                    // OUT → OUT
+                    //
+                    // HANYA TK TAMA.
+                    // =================================================
+                    $isTkTamaOutOut =
+                        $isTkTama
+                        &&
+                        $current->type === 'out'
+                        &&
+                        $next->type === 'out';
+
+
                     if (
-                        $current->type !== 'out'
-                        || $next->type !== 'in'
+                        !$isOutIn
+                        &&
+                        !$isTkTamaOutOut
                     ) {
                         continue;
                     }
 
 
-                    $jamKeluar = Carbon::parse(
-                        $tanggal
-                        . ' '
-                        . $current->time
-                    );
+                    // =================================================
+                    // JAM KELUAR
+                    // =================================================
+                    $jamKeluar =
+                        Carbon::parse(
+                            $tanggal
+                            . ' '
+                            . $current->time
+                        );
 
 
-                    $jamKembali = Carbon::parse(
-                        $tanggal
-                        . ' '
-                        . $next->time
-                    );
+                    // =================================================
+                    // JAM KEMBALI / CHECKOUT BERIKUTNYA
+                    // =================================================
+                    $jamKembali =
+                        Carbon::parse(
+                            $tanggal
+                            . ' '
+                            . $next->time
+                        );
 
 
-                    // =============================================
-                    // HANYA KELUAR DALAM JAM KERJA
-                    // =============================================
+                    // =================================================
+                    // HANYA KELUAR DI DALAM JAM KERJA
+                    // =================================================
                     if (
                         $jamKeluar->lt(
                             $standarMasuk
@@ -2486,10 +2544,28 @@ class AbsensiController extends Controller
                     }
 
 
-                    // =============================================
-                    // CEK IZIN YANG MENG-COVER
-                    // WAKTU KELUAR → KEMBALI
-                    // =============================================
+                    // =================================================
+                    // DURASI
+                    // =================================================
+                    if (
+                        !$jamKembali->gt(
+                            $jamKeluar
+                        )
+                    ) {
+                        continue;
+                    }
+
+
+                    $durasiKeluar =
+                        (int) $jamKeluar
+                            ->diffInMinutes(
+                                $jamKembali
+                            );
+
+
+                    // =================================================
+                    // CEK IZIN
+                    // =================================================
                     $adaIzin =
                         $izin->contains(
                             function ($permission) use (
@@ -2535,9 +2611,9 @@ class AbsensiController extends Controller
                         );
 
 
-                    // =============================================
+                    // =================================================
                     // KELUAR TANPA IZIN
-                    // =============================================
+                    // =================================================
                     if (!$adaIzin) {
 
                         $summary[
@@ -2590,9 +2666,9 @@ class AbsensiController extends Controller
                                 );
 
 
-                        // =========================================
+                        // =================================================
                         // TOTAL WAKTU DI LUAR
-                        // =========================================
+                        // =================================================
                         $totalMenitKeluar = 0;
 
 
@@ -2615,10 +2691,32 @@ class AbsensiController extends Controller
                                 $activitiesKerja[$i + 1];
 
 
+                            // =================================================
+                            // NORMAL:
+                            // OUT → IN
+                            // =================================================
+                            $isOutIn =
+                                $current->type === 'out'
+                                &&
+                                $next->type === 'in';
+
+
+                            // =================================================
+                            // KHUSUS TK TAMA:
+                            // OUT → OUT
+                            // =================================================
+                            $isTkTamaOutOut =
+                                $isTkTama
+                                &&
+                                $current->type === 'out'
+                                &&
+                                $next->type === 'out';
+
+
                             if (
-                                $current->type !== 'out'
-                                ||
-                                $next->type !== 'in'
+                                !$isOutIn
+                                &&
+                                !$isTkTamaOutOut
                             ) {
                                 continue;
                             }
@@ -2641,17 +2739,38 @@ class AbsensiController extends Controller
 
 
                             if (
-                                $kembali->gt(
+                                !$kembali->gt(
                                     $keluar
                                 )
                             ) {
-
-                                $totalMenitKeluar +=
-                                    (int) $keluar
-                                        ->diffInMinutes(
-                                            $kembali
-                                        );
+                                continue;
                             }
+
+
+                            // =================================================
+                            // HANYA KELUAR DALAM JAM KERJA
+                            // =================================================
+                            if (
+                                $keluar->lt(
+                                    $standarMasuk
+                                )
+                                ||
+                                $keluar->gte(
+                                    $standarPulang
+                                )
+                            ) {
+                                continue;
+                            }
+
+
+                            // =================================================
+                            // TAMBAHKAN WAKTU KELUAR
+                            // =================================================
+                            $totalMenitKeluar +=
+                                (int) $keluar
+                                    ->diffInMinutes(
+                                        $kembali
+                                    );
                         }
 
 
