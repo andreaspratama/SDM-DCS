@@ -3355,9 +3355,7 @@ class AbsensiController extends Controller
         // =====================================================
         // USER LOGIN
         // =====================================================
-        $user =
-            auth()->user();
-
+        $user = auth()->user();
 
         $isTU =
             $user
@@ -3373,7 +3371,6 @@ class AbsensiController extends Controller
         // =====================================================
         $tuUnitId = null;
 
-
         if ($isTU) {
 
             if (!$user->unit_id) {
@@ -3384,12 +3381,9 @@ class AbsensiController extends Controller
                 );
             }
 
-
-            $tuUnit =
-                Unit::find(
-                    $user->unit_id
-                );
-
+            $tuUnit = Unit::find(
+                $user->unit_id
+            );
 
             if (!$tuUnit) {
 
@@ -3398,7 +3392,6 @@ class AbsensiController extends Controller
                     'Unit TU tidak ditemukan.'
                 );
             }
-
 
             $bolehProcess =
                 in_array(
@@ -3411,7 +3404,6 @@ class AbsensiController extends Controller
                     true
                 );
 
-
             if (!$bolehProcess) {
 
                 abort(
@@ -3420,10 +3412,10 @@ class AbsensiController extends Controller
                 );
             }
 
-
             $tuUnitId =
                 (int) $user->unit_id;
         }
+
 
         // =====================================================
         // AMBIL SEMUA RAW LOG
@@ -3503,6 +3495,7 @@ class AbsensiController extends Controller
                 continue;
             }
 
+
             // =================================================
             // TU HANYA BOLEH MEMPROSES UNITNYA SENDIRI
             //
@@ -3538,21 +3531,19 @@ class AbsensiController extends Controller
                     $tanggal
                 );
 
+
             // =================================================
             // CEK KALDIK
             // =================================================
-            $calendar = $calendarService->getCalendar(
-                $tanggal,
-                $employee->unit_id
-            );
+            $calendar =
+                $calendarService->getCalendar(
+                    $tanggal,
+                    $employee->unit_id
+                );
 
 
             // =================================================
             // KEGIATAN RESMI DI HARI LIBUR
-            //
-            // Contoh:
-            // 17 Agustus tetap libur nasional,
-            // tetapi ada Upacara Hari Kemerdekaan.
             // =================================================
             $isKegiatanResmi =
                 !$jadwal
@@ -3566,32 +3557,21 @@ class AbsensiController extends Controller
 
             // =================================================
             // LEMBUR
-            //
-            // Tidak ada jadwal + bukan kegiatan resmi.
             // =================================================
             $isLembur =
                 !$jadwal
                 &&
                 !$isKegiatanResmi;
 
+
             // =================================================
-            // JAM REFERENSI UNTUK MENENTUKAN IN / OUT
+            // JAM REFERENSI
             //
-            // Hari kerja normal:
-            // → pakai jadwal aktual.
-            //
-            // Hari libur:
-            // → Lembur maupun Kegiatan Resmi
-            // → pakai template dasar pegawai sebagai referensi.
-            //
-            // Jam referensi ini TIDAK digunakan untuk menghitung
-            // telat pada lembur / kegiatan resmi.
+            // Dipakai hanya untuk menentukan keterlambatan
+            // pada hari kerja normal.
             // =================================================
             if ($jadwal) {
 
-                // =============================================
-                // HARI KERJA NORMAL
-                // =============================================
                 $jamReferensiMasuk =
                     \Carbon\Carbon::parse(
                         $tanggal
@@ -3608,24 +3588,16 @@ class AbsensiController extends Controller
 
             } else {
 
-                // =============================================
-                // HARI LIBUR
-                //
-                // Bisa:
-                // - LEMBUR
-                // - KEGIATAN RESMI
-                //
-                // Gunakan template dasar hanya untuk menentukan
-                // scan pertama kemungkinan IN atau OUT.
-                // =============================================
                 $baseSchedule =
                     $employee->workSchedule;
 
 
                 if (
                     $baseSchedule
-                    && $baseSchedule->jam_masuk
-                    && $baseSchedule->jam_pulang
+                    &&
+                    $baseSchedule->jam_masuk
+                    &&
+                    $baseSchedule->jam_pulang
                 ) {
 
                     $jamReferensiMasuk =
@@ -3644,12 +3616,6 @@ class AbsensiController extends Controller
 
                 } else {
 
-                    // =========================================
-                    // FALLBACK
-                    //
-                    // Hanya jika pegawai belum mempunyai
-                    // template jadwal dasar.
-                    // =========================================
                     $jamReferensiMasuk =
                         \Carbon\Carbon::parse(
                             $tanggal . ' 08:00:00'
@@ -3664,112 +3630,228 @@ class AbsensiController extends Controller
 
 
             // =================================================
-            // TITIK TENGAH JADWAL REFERENSI
-            // =================================================
-            $durasiDetik =
-                $jamReferensiMasuk
-                    ->diffInSeconds(
-                        $jamReferensiPulang
-                    );
-
-
-            $midPoint =
-                $jamReferensiMasuk
-                    ->copy()
-                    ->addSeconds(
-                        (int) floor(
-                            $durasiDetik / 2
-                        )
-                    );
-
-
-            // =================================================
-            // TENTUKAN TIPE SCAN PERTAMA
-            // =================================================
-            $firstScanTime =
-                $first->parsed_time;
-
-
-            $firstType =
-                $firstScanTime->lte($midPoint)
-                    ? 'in'
-                    : 'out';
-
-
-            // =================================================
             // SUSUN ACTIVITY
+            //
+            // DEFAULT:
+            // Scan 1 = IN
+            // Scan 2 = OUT
+            // Scan 3 = IN
+            // Scan 4 = OUT
+            // dst.
+            //
+            // EXCEPTION:
+            // Jika scan terakhir secara pola menjadi IN,
+            // tetapi scan sebelumnya adalah OUT dan waktunya
+            // sudah jauh setelah OUT tersebut, maka scan terakhir
+            // dianggap sebagai PULANG.
+            //
+            // Contoh:
+            //
+            // 06:52 IN
+            // 08:59 OUT
+            // 09:18 IN
+            // 15:46 OUT
+            // 16:10 OUT  <-- pulang
             // =================================================
+
+            // KODE BARU YAAA.........
             $activities = [];
+            $totalScans = $items->count();
 
+            foreach ($items as $index => $item) {
 
-            foreach (
-                $items as $index => $item
-            ) {
+                // Default:
+                // scan 1 = IN
+                // scan 2 = OUT
+                // scan 3 = IN
+                // scan 4 = OUT
+                $type = ($index % 2 === 0) ? 'in' : 'out';
 
-                if ($index % 2 === 0) {
+                $note = $type === 'in'
+                    ? 'Masuk'
+                    : 'Keluar';
 
-                    $type =
-                        $firstType;
-
-                } else {
-
-                    $type =
-                        $firstType === 'in'
-                            ? 'out'
-                            : 'in';
-                }
-
-
-                $note =
-                    $type === 'in'
-                        ? 'Masuk'
-                        : 'Keluar';
-
-
-                // Scan pertama OUT:
-                // kemungkinan lupa scan masuk.
+                /*
+                |--------------------------------------------------------------------------
+                | KHUSUS SCAN TERAKHIR
+                |--------------------------------------------------------------------------
+                | Kalau jumlah scan ganjil, scan terakhir secara pola adalah IN.
+                |
+                | Tetapi kalau:
+                | - sebelumnya adalah OUT
+                | - dan scan terakhir sudah >= jam pulang
+                |
+                | maka scan terakhir sebenarnya adalah scan PULANG.
+                |
+                | Contoh:
+                | 06:52 IN
+                | 08:59 OUT
+                | 09:18 IN
+                | 15:46 OUT
+                | 16:10 IN  <-- secara pola IN
+                |
+                | Karena 16:10 sudah lewat jam pulang,
+                | kita ubah menjadi OUT / PULANG.
+                |--------------------------------------------------------------------------
+                */
                 if (
-                    $index === 0
-                    &&
-                    $type === 'out'
+                    $index === $totalScans - 1
+                    && $type === 'in'
+                    && $index > 0
+                    && $activities[$index - 1]['type'] === 'out'
+                    && $item->parsed_time->gte($jamReferensiPulang)
                 ) {
-
-                    $note =
-                        'Keluar/Pulang '
-                        . '(scan masuk tidak tercatat)';
+                    $type = 'out';
+                    $note = 'Pulang';
                 }
 
-
-                // Activity terakhir IN:
-                // kemungkinan lupa scan pulang.
+                /*
+                |--------------------------------------------------------------------------
+                | SCAN TERAKHIR YANG MASIH IN
+                |--------------------------------------------------------------------------
+                | Kalau scan terakhir belum dianggap pulang,
+                | tetap beri keterangan bahwa scan pulang belum tercatat.
+                |--------------------------------------------------------------------------
+                */
                 if (
-                    $index === $items->count() - 1
-                    &&
-                    $type === 'in'
+                    $index === $totalScans - 1
+                    && $type === 'in'
                 ) {
-
-                    $note =
-                        $items->count() === 1
-                            ? 'Masuk '
-                                . '(scan pulang tidak tercatat)'
-                            : 'Masuk/Kembali '
-                                . '(scan pulang tidak tercatat)';
+                    $note = $totalScans === 1
+                        ? 'Masuk (scan pulang tidak tercatat)'
+                        : 'Masuk/Kembali (scan pulang tidak tercatat)';
                 }
-
 
                 $activities[] = [
-
-                    'time' =>
-                        $item->parsed_time
-                            ->format('H:i:s'),
-
-                    'type' =>
-                        $type,
-
-                    'note' =>
-                        $note,
+                    'time' => $item->parsed_time->format('H:i:s'),
+                    'type' => $type,
+                    'note' => $note,
                 ];
             }
+            
+            // $activities = [];
+
+            // $totalScans = $items->count();
+
+            // foreach ($items as $index => $item) {
+
+            //     // =================================================
+            //     // DEFAULT: BERDASARKAN URUTAN
+            //     // =================================================
+            //     if ($index % 2 === 0) {
+
+            //         $type = 'in';
+            //         $note = 'Masuk';
+
+            //     } else {
+
+            //         $type = 'out';
+            //         $note = 'Keluar';
+            //     }
+
+
+            //     // =================================================
+            //     // EXCEPTION SCAN TERAKHIR
+            //     //
+            //     // Jika secara pola scan terakhir = IN,
+            //     // tetapi sebelumnya = OUT,
+            //     // kita cek apakah ini kemungkinan scan pulang.
+            //     //
+            //     // Contoh:
+            //     // 15:46 OUT
+            //     // 16:10 IN (secara pola)
+            //     //
+            //     // → dianggap OUT / Pulang
+            //     // =================================================
+            //     if (
+            //         $index === $totalScans - 1
+            //         &&
+            //         $type === 'in'
+            //         &&
+            //         $index > 0
+            //     ) {
+
+            //         $previousItem =
+            //             $items[$index - 1];
+
+            //         $previousTime =
+            //             $previousItem->parsed_time;
+
+            //         $currentTime =
+            //             $item->parsed_time;
+
+            //         $selisihMenit =
+            //             $previousTime->diffInMinutes(
+            //                 $currentTime
+            //             );
+
+
+            //         // =================================================
+            //         // Jika scan terakhir cukup jauh dari OUT sebelumnya,
+            //         // anggap sebagai scan pulang tambahan.
+            //         //
+            //         // Batas 15 menit:
+            //         // 15:46 → 16:10 = 24 menit
+            //         //
+            //         // Tidak mengganggu kasus scan rapat:
+            //         // 09:02 → 09:13 = 11 menit
+            //         // =================================================
+            //         if ($selisihMenit >= 15) {
+
+            //             $type = 'out';
+
+            //             $note =
+            //                 'Pulang '
+            //                 . '(scan masuk kembali tidak tercatat)';
+            //         }
+            //     }
+
+
+            //     // =================================================
+            //     // SCAN PERTAMA
+            //     // =================================================
+            //     if ($index === 0) {
+
+            //         $type = 'in';
+            //         $note = 'Masuk';
+            //     }
+
+
+            //     // =================================================
+            //     // SCAN TERAKHIR = IN
+            //     //
+            //     // Hanya berlaku kalau memang tetap IN setelah
+            //     // pengecekan exception di atas.
+            //     // =================================================
+            //     if (
+            //         $index === $totalScans - 1
+            //         &&
+            //         $type === 'in'
+            //     ) {
+
+            //         $note =
+            //             $totalScans === 1
+            //                 ? 'Masuk (scan pulang tidak tercatat)'
+            //                 : 'Masuk/Kembali (scan pulang tidak tercatat)';
+            //     }
+
+
+            //     // =================================================
+            //     // SIMPAN ACTIVITY
+            //     // =================================================
+            //     $activities[] = [
+
+            //         'time' =>
+            //             $item->parsed_time
+            //                 ->format('H:i:s'),
+
+            //         'type' =>
+            //             $type,
+
+            //         'note' =>
+            //             $note,
+            //     ];
+            // }
 
 
             // =================================================
@@ -3803,7 +3885,8 @@ class AbsensiController extends Controller
             // =================================================
             // TERLAMBAT
             //
-            // LEMBUR TIDAK BOLEH DIHITUNG TELAT.
+            // LEMBUR DAN KEGIATAN RESMI
+            // TIDAK DIHITUNG TERLAMBAT.
             // =================================================
             $late = 0;
 
@@ -3845,15 +3928,18 @@ class AbsensiController extends Controller
             // =================================================
             if ($isKegiatanResmi) {
 
-                $status = 'kegiatan_resmi';
+                $status =
+                    'kegiatan_resmi';
 
             } elseif ($isLembur) {
 
-                $status = 'lembur';
+                $status =
+                    'lembur';
 
             } else {
 
-                $status = 'hadir';
+                $status =
+                    'hadir';
             }
 
 
@@ -3893,7 +3979,9 @@ class AbsensiController extends Controller
                 ->delete();
 
 
-            foreach ($activities as $activity) {
+            foreach (
+                $activities as $activity
+            ) {
 
                 $attendance
                     ->activities()
