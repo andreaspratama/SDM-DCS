@@ -2311,31 +2311,18 @@ class AttendanceFileImportService
 
             foreach ($rows as $index => $row) {
 
-                if (
-        in_array(
-            'Hanna Megawati',
-            array_map(
-                fn ($value) => trim((string) $value),
-                $row
-            ),
-            true
-        )
-    ) {
-        // dd([
-        //     'index' => $index,
-        //     'row' => $row,
-        // ]);
-    }
-
                 // =====================================================
                 // SKIP BARIS KOSONG
                 // =====================================================
-                if (empty(array_filter(
-                    $row,
-                    fn ($value) =>
-                        $value !== null &&
-                        trim((string) $value) !== ''
-                ))) {
+
+                if (
+                    empty(array_filter(
+                        $row,
+                        fn ($value) =>
+                            $value !== null &&
+                            trim((string) $value) !== ''
+                    ))
+                ) {
                     continue;
                 }
 
@@ -2343,6 +2330,7 @@ class AttendanceFileImportService
                 // =====================================================
                 // HEADER
                 // =====================================================
+
                 $firstColumn =
                     $this->normalizeHeader(
                         $row[0] ?? ''
@@ -2355,7 +2343,11 @@ class AttendanceFileImportService
 
                 // =====================================================
                 // UID
+                //
+                // TK TAMA:
+                // kolom 1 = No. Staff
                 // =====================================================
+
                 $uid = trim(
                     (string) ($row[1] ?? '')
                 );
@@ -2367,9 +2359,17 @@ class AttendanceFileImportService
 
                 // =====================================================
                 // TANGGAL
+                //
+                // FORMAT AKTUAL:
+                //
+                // 0 Nama
+                // 1 No. Staff
+                // 2 Dept.
+                // 3 Tanggal
                 // =====================================================
+
                 $dateValue =
-                    $row[2] ?? null;
+                    $row[3] ?? null;
 
                 if (
                     $dateValue === null ||
@@ -2416,6 +2416,7 @@ class AttendanceFileImportService
                 // =====================================================
                 // EMPLOYEE
                 // =====================================================
+
                 $employee =
                     $this->employeeByExactUid(
                         $uid
@@ -2437,69 +2438,76 @@ class AttendanceFileImportService
                 // =====================================================
                 // AMBIL SEMUA SCAN TK TAMA
                 //
-                // Format Excel:
-                // 0 = Nama
-                // 1 = No. Staff
-                // 2 = Tanggal
-                // 3 = Hari
-                // 4 = Masuk
-                // 5 = Keluar
-                // 6 = Masuk
-                // 7 = Keluar
-                // 8 = Lembur Masuk
-                // 9 = Lembur Keluar
+                // FORMAT AKTUAL 24 KOLOM:
+                //
+                // 8  = Masuk
+                // 10 = Keluar
+                // 11 = Masuk
+                // 12 = Keluar
+                // 13 = Lembur Masuk
+                // 14 = Lembur Keluar
                 // =====================================================
+
                 $scanColumns = [
 
                     // ABSENSI REGULER
-                    4 => [
+                    8 => [
                         'type' => 'in',
                         'overtime' => false,
                     ],
 
-                    5 => [
+                    10 => [
                         'type' => 'out',
                         'overtime' => false,
                     ],
 
-                    6 => [
+                    11 => [
                         'type' => 'in',
                         'overtime' => false,
                     ],
 
-                    7 => [
+                    12 => [
                         'type' => 'out',
                         'overtime' => false,
                     ],
 
                     // LEMBUR
-                    8 => [
+                    13 => [
                         'type' => 'in',
                         'overtime' => true,
                     ],
 
-                    9 => [
+                    14 => [
                         'type' => 'out',
                         'overtime' => true,
                     ],
                 ];
 
+
                 $activities = [];
+
 
                 foreach ($scanColumns as $column => $config) {
 
-                    $time = $this->parseTkTamaTime(
-                        $row[$column] ?? null
-                    );
+                    $time =
+                        $this->parseTkTamaTime(
+                            $row[$column] ?? null
+                        );
 
                     if (!$time) {
                         continue;
                     }
 
+
                     $activities[] = [
-                        'time' => $time,
-                        'type' => $config['type'],
-                        'overtime' => $config['overtime'],
+                        'time' =>
+                            $time,
+
+                        'type' =>
+                            $config['type'],
+
+                        'overtime' =>
+                            $config['overtime'],
                     ];
                 }
 
@@ -2507,6 +2515,7 @@ class AttendanceFileImportService
                 // =====================================================
                 // TIDAK ADA SCAN
                 // =====================================================
+
                 if (empty($activities)) {
                     continue;
                 }
@@ -2515,6 +2524,7 @@ class AttendanceFileImportService
                 // =====================================================
                 // SORT BERDASARKAN JAM
                 // =====================================================
+
                 usort(
                     $activities,
                     function ($a, $b) {
@@ -2531,9 +2541,9 @@ class AttendanceFileImportService
                 // CHECK IN = IN TERAWAL
                 // CHECK OUT = OUT TERAKHIR
                 // =====================================================
+
                 $checkIn = null;
                 $checkOut = null;
-
 
                 foreach ($activities as $activity) {
 
@@ -2559,8 +2569,9 @@ class AttendanceFileImportService
 
 
                 // =====================================================
-                // SIMPAN KHUSUS TK TAMA
+                // SIMPAN ABSENSI
                 // =====================================================
+
                 $this->saveTkTamaAttendance(
                     $employee,
                     $date,
