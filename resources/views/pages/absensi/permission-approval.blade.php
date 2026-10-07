@@ -146,11 +146,11 @@
                                     </th>
 
                                     <th>
-                                        Tanggal
+                                        Tanggal Izin
                                     </th>
 
                                     <th>
-                                        Jam
+                                        Jam Izin
                                     </th>
 
                                     <th>
@@ -167,6 +167,10 @@
 
                                     <th>
                                         Lampiran
+                                    </th>
+
+                                    <th>
+                                        Dibuat
                                     </th>
 
                                     @if(!$isTU)
@@ -316,6 +320,14 @@ $(document).ready(function () {
                 orderable: false,
                 searchable: false,
                 className: 'text-center'
+            },
+
+            {
+                data: 'dibuat',
+                name: 'dibuat',
+                orderable: true,
+                searchable: false,
+                className: 'text-nowrap'
             }
 
             @if(!$isTU)

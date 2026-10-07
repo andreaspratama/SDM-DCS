@@ -252,6 +252,9 @@ class AttendancePermissionApprovalController extends Controller
 
                 'approved_by',
                 'approved_at',
+
+                // TANGGAL/JAM PENGAJUAN DIBUAT
+                'created_at',
             ])
 
             ->with([
@@ -429,7 +432,7 @@ class AttendancePermissionApprovalController extends Controller
 
 
             // =================================================
-            // TANGGAL
+            // TANGGAL IZIN
             // =================================================
 
             ->addColumn(
@@ -462,6 +465,24 @@ class AttendancePermissionApprovalController extends Controller
                     }
 
                     return $html;
+                }
+            )
+
+
+            // =================================================
+            // TANGGAL DIBUAT / DIAJUKAN
+            // =================================================
+
+            ->addColumn(
+                'dibuat',
+                function ($permission) {
+
+                    if (!$permission->created_at) {
+                        return '-';
+                    }
+
+                    return $permission->created_at
+                        ->format('d-m-Y H:i');
                 }
             )
 
@@ -732,6 +753,35 @@ class AttendancePermissionApprovalController extends Controller
                 }
             )
 
+            ->addColumn(
+                'dibuat',
+                function ($permission) {
+
+                    if (!$permission->created_at) {
+                        return '-';
+                    }
+
+                    $tanggal = $permission->created_at
+                        ->timezone('Asia/Jakarta')
+                        ->translatedFormat('d M Y');
+
+                    $jam = $permission->created_at
+                        ->timezone('Asia/Jakarta')
+                        ->format('H:i');
+
+                    return
+                        '<div class="text-nowrap">'
+                        . '<div class="fw-semibold">'
+                        . e($tanggal)
+                        . '</div>'
+                        . '<div class="small text-muted">'
+                        . '<i class="fa-regular fa-clock me-1"></i>'
+                        . e($jam)
+                        . '</div>'
+                        . '</div>';
+                }
+            )
+
 
             // =================================================
             // AKSI
@@ -839,6 +889,7 @@ class AttendancePermissionApprovalController extends Controller
                 'type',
                 'status',
                 'attachment',
+                'dibuat',
                 'aksi',
             ])
 
