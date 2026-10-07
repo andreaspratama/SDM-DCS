@@ -877,6 +877,14 @@
                                             </span>
 
                                             @break
+                                            
+                                        @case('Sekretaris')
+
+                                            <span class="badge-role role-director">
+                                                Sekretaris
+                                            </span>
+
+                                            @break
 
 
                                         @case('Kepala Bidang')

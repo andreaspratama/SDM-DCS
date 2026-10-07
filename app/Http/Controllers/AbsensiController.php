@@ -3655,77 +3655,232 @@ class AbsensiController extends Controller
             // =================================================
 
             // KODE BARU YAAA.........
+            // =========================================================
+            // SUSUN ACTIVITY
+            //
+            // DEFAULT:
+            // Scan 1 = IN
+            // Scan 2 = OUT
+            // Scan 3 = IN
+            // Scan 4 = OUT
+            // dst.
+            //
+            // KHUSUS SHS/SMA:
+            //
+            // Jika terdapat pola:
+            //
+            // 06:51 IN
+            // 16:11 OUT
+            // 16:16 IN (secara pola)
+            //
+            // maka:
+            //
+            // 06:51 → Masuk
+            // 16:11 → Keluar tanpa absen kembali
+            // 16:16 → Pulang
+            //
+            // Unit lain tetap menggunakan pola normal.
+            // =========================================================
+
             $activities = [];
+
             $totalScans = $items->count();
+
+
+            // =========================================================
+            // CEK APAKAH EMPLOYEE ADALAH SHS / SMA
+            //
+            // Menggunakan unit employee pada tanggal tersebut.
+            // =========================================================
+
+            $activityUnitId =
+                $employeeUnitService->getUnitId(
+                    $employee,
+                    $tanggal
+                );
+
+            $activityUnit =
+                Unit::find($activityUnitId);
+
+            $isSmaActivity =
+                $activityUnit
+                &&
+                in_array(
+                    strtoupper(trim($activityUnit->code)),
+                    [
+                        'SHS',
+                        'SMA',
+                    ],
+                    true
+                );
+
+            // dd([
+            //     'employee' => $employee->nama,
+            //     'employee_unit_id' => $employee->unit_id,
+            //     'activity_unit_id' => $activityUnitId,
+            //     'activity_unit_code' => $activityUnit?->code,
+            //     'is_sma_activity' => $isSmaActivity,
+            //     'tanggal' => $tanggal,
+            //     'scans' => $items->pluck('parsed_time')->map(
+            //         fn ($time) => $time->format('H:i:s')
+            //     )->values()->all(),
+            // ]);
+
+
+            // =========================================================
+            // SUSUN SATU PER SATU SCAN
+            // =========================================================
 
             foreach ($items as $index => $item) {
 
-                // Default:
-                // scan 1 = IN
-                // scan 2 = OUT
-                // scan 3 = IN
-                // scan 4 = OUT
-                $type = ($index % 2 === 0) ? 'in' : 'out';
+                // =====================================================
+                // DEFAULT POLA
+                // =====================================================
 
-                $note = $type === 'in'
-                    ? 'Masuk'
-                    : 'Keluar';
+                $type =
+                    ($index % 2 === 0)
+                        ? 'in'
+                        : 'out';
 
-                /*
-                |--------------------------------------------------------------------------
-                | KHUSUS SCAN TERAKHIR
-                |--------------------------------------------------------------------------
-                | Kalau jumlah scan ganjil, scan terakhir secara pola adalah IN.
-                |
-                | Tetapi kalau:
-                | - sebelumnya adalah OUT
-                | - dan scan terakhir sudah >= jam pulang
-                |
-                | maka scan terakhir sebenarnya adalah scan PULANG.
-                |
-                | Contoh:
-                | 06:52 IN
-                | 08:59 OUT
-                | 09:18 IN
-                | 15:46 OUT
-                | 16:10 IN  <-- secara pola IN
-                |
-                | Karena 16:10 sudah lewat jam pulang,
-                | kita ubah menjadi OUT / PULANG.
-                |--------------------------------------------------------------------------
-                */
+                $note =
+                    $type === 'in'
+                        ? 'Masuk'
+                        : 'Keluar';
+
+
+                // =====================================================
+                // KHUSUS SMA/SHS
+                //
+                // Mendeteksi:
+                //
+                // OUT
+                // lalu scan berikutnya berada di/setelah jam pulang
+                //
+                // Contoh:
+                //
+                // 06:51 IN
+                // 16:11 OUT
+                // 16:16 IN
+                //
+                // 16:16 nanti akan diubah menjadi PULANG
+                // sehingga 16:11 berarti orang keluar tanpa
+                // melakukan scan kembali.
+                // =====================================================
+
                 if (
-                    $index === $totalScans - 1
-                    && $type === 'in'
-                    && $index > 0
-                    && $activities[$index - 1]['type'] === 'out'
-                    && $item->parsed_time->gte($jamReferensiPulang)
+                    $isSmaActivity
+                    &&
+                    $type === 'out'
+                    &&
+                    $index < ($totalScans - 1)
                 ) {
+
+                    $nextItem =
+                        $items[$index + 1];
+
+                    $nextTime =
+                        $nextItem->parsed_time;
+
+
+                    // =================================================
+                    // Jika scan berikutnya sudah mencapai jam pulang,
+                    // maka OUT sekarang dianggap:
+                    //
+                    // "Keluar tanpa absen kembali"
+                    //
+                    // Contoh:
+                    //
+                    // 16:11 OUT
+                    // 16:16 IN → kemudian dianggap PULANG
+                    // =================================================
+
+                    if (
+                        $nextTime->gte(
+                            $jamReferensiPulang
+                        )
+                    ) {
+
+                        $note =
+                            'Keluar tanpa absen kembali';
+                    }
+                }
+
+
+                // =====================================================
+                // KHUSUS SCAN TERAKHIR
+                //
+                // Kalau scan terakhir secara pola adalah IN,
+                // tetapi:
+                //
+                // - sebelumnya OUT
+                // - waktunya sudah >= jam pulang
+                //
+                // maka scan terakhir dianggap PULANG.
+                //
+                // Contoh:
+                //
+                // 06:51 IN
+                // 16:11 OUT
+                // 16:16 IN
+                //
+                // 16:16 → PULANG
+                // =====================================================
+
+                if (
+                    $index === ($totalScans - 1)
+                    &&
+                    $type === 'in'
+                    &&
+                    $index > 0
+                    &&
+                    $activities[$index - 1]['type'] === 'out'
+                    &&
+                    $item->parsed_time->gte(
+                        $jamReferensiPulang
+                    )
+                ) {
+
                     $type = 'out';
+
                     $note = 'Pulang';
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | SCAN TERAKHIR YANG MASIH IN
-                |--------------------------------------------------------------------------
-                | Kalau scan terakhir belum dianggap pulang,
-                | tetap beri keterangan bahwa scan pulang belum tercatat.
-                |--------------------------------------------------------------------------
-                */
+
+                // =====================================================
+                // SCAN TERAKHIR YANG MASIH IN
+                //
+                // Kalau scan terakhir belum dianggap pulang,
+                // beri informasi bahwa scan pulang belum tercatat.
+                // =====================================================
+
                 if (
-                    $index === $totalScans - 1
-                    && $type === 'in'
+                    $index === ($totalScans - 1)
+                    &&
+                    $type === 'in'
                 ) {
-                    $note = $totalScans === 1
-                        ? 'Masuk (scan pulang tidak tercatat)'
-                        : 'Masuk/Kembali (scan pulang tidak tercatat)';
+
+                    $note =
+                        $totalScans === 1
+                            ? 'Masuk (scan pulang tidak tercatat)'
+                            : 'Masuk/Kembali (scan pulang tidak tercatat)';
                 }
 
+
+                // =====================================================
+                // SIMPAN ACTIVITY
+                // =====================================================
+
                 $activities[] = [
-                    'time' => $item->parsed_time->format('H:i:s'),
-                    'type' => $type,
-                    'note' => $note,
+
+                    'time' =>
+                        $item->parsed_time
+                            ->format('H:i:s'),
+
+                    'type' =>
+                        $type,
+
+                    'note' =>
+                        $note,
                 ];
             }
             

@@ -107,8 +107,11 @@ class EmployeeOrganizationController extends Controller
         // =================================================
         $roles = [
             'Direktur',
+            'Sekretaris',
             'Kepala Bidang',
             'Kepala Sekolah',
+            'Waka Kurikulum',
+            'Waka Kesiswaan',
             'Guru',
             'Staff',
         ];
@@ -173,6 +176,7 @@ class EmployeeOrganizationController extends Controller
 
         $roles = [
             'Direktur',
+            'Sekretaris',
             'Kepala Bidang',
             'Kepala Sekolah',
             'Waka Kurikulum',
@@ -206,6 +210,7 @@ class EmployeeOrganizationController extends Controller
 
         $roles = [
             'Direktur',
+            'Sekretaris',
             'Kepala Bidang',
             'Kepala Sekolah',
             'Waka Kurikulum',

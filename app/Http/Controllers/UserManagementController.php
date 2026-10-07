@@ -39,6 +39,7 @@ class UserManagementController extends Controller
             ->whereDoesntHave('user')
             ->whereIn('role', [
                 'Direktur',
+                'Sekretaris',
                 'Kepala Bidang',
                 'Kepala Sekolah',
             ])
@@ -57,6 +58,7 @@ class UserManagementController extends Controller
             ])
             ->whereIn('role', [
                 'Direktur',
+                'Sekretaris',
                 'Kepala Bidang',
                 'Kepala Sekolah',
             ])
@@ -182,6 +184,7 @@ class UserManagementController extends Controller
 
             $allowedLeadershipRoles = [
                 'Direktur',
+                'Sekretaris',
                 'Kepala Bidang',
                 'Kepala Sekolah',
             ];
@@ -369,6 +372,7 @@ class UserManagementController extends Controller
 
             $allowedLeadershipRoles = [
                 'Direktur',
+                'Sekretaris',
                 'Kepala Bidang',
                 'Kepala Sekolah',
             ];

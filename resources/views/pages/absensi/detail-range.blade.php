@@ -510,6 +510,22 @@
         }
     }
 
+    // =====================================================
+    // KHUSUS SMA / SHS
+    // =====================================================
+
+    $isSmaShs =
+        $employee->unit
+        &&
+        in_array(
+            strtoupper(trim((string) ($employee->unit->code ?? ''))),
+            [
+                'SHS',
+                'SMA',
+            ],
+            true
+        );
+
 
     // =====================================================
     // AKTIVITAS KELUAR → MASUK
@@ -723,6 +739,130 @@
                         '#dc2626',
                 ];
             }
+        }
+    }
+
+    // =====================================================
+    // KHUSUS SMA / SHS
+    // KELUAR TANPA ABSEN KEMBALI
+    //
+    // Contoh:
+    // 06:51 IN
+    // 16:11 OUT
+    // 16:16 OUT / PULANG
+    //
+    // Maka:
+    // 16:11 → Keluar tanpa absen kembali
+    // 16:16 → Pulang
+    // =====================================================
+
+    if (
+        $isSmaShs
+        &&
+        $isHariReguler
+        &&
+        $att
+        &&
+        $att->activities
+        &&
+        $jamMasukStandar
+        &&
+        $jamPulangStandar
+    ) {
+
+        $activitiesSma =
+            $att->activities
+                ->sortBy('time')
+                ->values();
+
+
+        for (
+            $i = 0;
+            $i < $activitiesSma->count() - 1;
+            $i++
+        ) {
+
+            $current =
+                $activitiesSma[$i];
+
+            $next =
+                $activitiesSma[$i + 1];
+
+
+            // =================================================
+            // HANYA OUT → OUT
+            // =================================================
+            if (
+                $current->type !== 'out'
+                ||
+                $next->type !== 'out'
+            ) {
+                continue;
+            }
+
+
+            // =================================================
+            // JAM KELUAR
+            // =================================================
+            $jamKeluarSma =
+                \Carbon\Carbon::parse(
+                    $row['tanggal']
+                    . ' '
+                    . $current->time
+                );
+
+
+            // =================================================
+            // JAM SCAN BERIKUTNYA
+            // =================================================
+            $jamBerikutnyaSma =
+                \Carbon\Carbon::parse(
+                    $row['tanggal']
+                    . ' '
+                    . $next->time
+                );
+
+
+            // =================================================
+            // HANYA JIKA SCAN BERIKUTNYA SUDAH
+            // MENCAPAI JAM PULANG
+            // =================================================
+            if (
+                $jamBerikutnyaSma->lt(
+                    $standarPulang
+                )
+            ) {
+                continue;
+            }
+
+
+            // =================================================
+            // DURASI KELUAR
+            // =================================================
+            $durasiKeluarSma =
+                (int) $jamKeluarSma
+                    ->diffInMinutes(
+                        $jamBerikutnyaSma
+                    );
+
+
+            // =================================================
+            // TIMELINE
+            // =================================================
+            $timeline[] = [
+
+                'text' =>
+                    '🚨 Keluar tanpa absen kembali: '
+                    . $durasiKeluarSma
+                    . ' menit ('
+                    . $current->time
+                    . ' - '
+                    . $next->time
+                    . ')',
+
+                'color' =>
+                    '#dc2626',
+            ];
         }
     }
 
