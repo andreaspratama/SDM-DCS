@@ -70,6 +70,14 @@ class AttendancePermissionApprovalController extends Controller
         // Hanya pending
         if (!$permission->isPending()) {
 
+            if ($request->expectsJson()) {
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pengajuan ini sudah pernah diproses.',
+                ], 422);
+            }
+
             return back()->with([
                 'message' => 'Pengajuan ini sudah pernah diproses.',
                 'alert-type' => 'warning',
@@ -93,12 +101,28 @@ class AttendancePermissionApprovalController extends Controller
         ]);
 
 
+        // =====================================================
+        // AJAX
+        // =====================================================
+
+        if ($request->expectsJson()) {
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan izin berhasil disetujui.',
+            ]);
+        }
+
+
+        // =====================================================
+        // REQUEST BIASA
+        // =====================================================
+
         return back()->with([
             'message' => 'Pengajuan izin berhasil disetujui.',
             'alert-type' => 'success',
         ]);
     }
-
 
     // =====================================================
     // REJECT
@@ -121,6 +145,14 @@ class AttendancePermissionApprovalController extends Controller
 
         // Hanya pending
         if (!$permission->isPending()) {
+
+            if ($request->expectsJson()) {
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pengajuan ini sudah pernah diproses.',
+                ], 422);
+            }
 
             return back()->with([
                 'message' => 'Pengajuan ini sudah pernah diproses.',
@@ -145,12 +177,28 @@ class AttendancePermissionApprovalController extends Controller
         ]);
 
 
+        // =====================================================
+        // AJAX
+        // =====================================================
+
+        if ($request->expectsJson()) {
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan izin berhasil ditolak.',
+            ]);
+        }
+
+
+        // =====================================================
+        // REQUEST BIASA
+        // =====================================================
+
         return back()->with([
             'message' => 'Pengajuan izin berhasil ditolak.',
             'alert-type' => 'success',
         ]);
     }
-
 
     // =====================================================
     // SECURITY APPROVAL
@@ -847,29 +895,23 @@ class AttendancePermissionApprovalController extends Controller
 
                         .
 
-                        '<form action="'
-                        . e($approveUrl)
-                        . '" method="POST">'
-                        . csrf_field()
-                        . '<button type="submit"
-                            class="btn btn-success btn-sm"
-                            onclick="return confirm(\'Setujui izin ini?\')">
+                        '<button type="button"
+                            class="btn btn-success btn-sm btn-approve-permission"
+                            data-url="' . e($approveUrl) . '">
+
                             ✔ Setujui
+
                         </button>'
-                        . '</form>'
 
                         .
 
-                        '<form action="'
-                        . e($rejectUrl)
-                        . '" method="POST">'
-                        . csrf_field()
-                        . '<button type="submit"
-                            class="btn btn-danger btn-sm"
-                            onclick="return confirm(\'Tolak izin ini?\')">
+                        '<button type="button"
+                            class="btn btn-danger btn-sm btn-reject-permission"
+                            data-url="' . e($rejectUrl) . '">
+
                             ✖ Tolak
+
                         </button>'
-                        . '</form>'
 
                         .
 

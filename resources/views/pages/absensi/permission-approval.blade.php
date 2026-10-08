@@ -430,6 +430,277 @@ $(document).ready(function () {
 
     });
 
+    // =====================================================
+    // APPROVE
+    // =====================================================
+
+    $(document).on(
+        'click',
+        '.btn-approve-permission',
+        function () {
+
+            const button = $(this);
+
+            const url = button.data('url');
+
+
+            if (!confirm('Setujui izin ini?')) {
+                return;
+            }
+
+
+            // Simpan teks asli
+            const originalHtml = button.html();
+
+
+            // Disable tombol
+            button
+                .prop('disabled', true)
+                .html(
+                    '<span class="spinner-border spinner-border-sm me-1"></span>' +
+                    'Memproses...'
+                );
+
+
+            $.ajax({
+
+                url: url,
+
+                type: 'POST',
+
+                data: {
+
+                    _token:
+                        '{{ csrf_token() }}'
+
+                },
+
+                headers: {
+
+                    'Accept':
+                        'application/json'
+
+                },
+
+
+                success: function (response) {
+
+                    if (response.success) {
+
+                        // Reload DataTables saja
+                        // Filter tanggal TETAP
+                        table.ajax.reload(null, false);
+
+
+                        // Optional notification
+                        showApprovalMessage(
+                            response.message,
+                            'success'
+                        );
+
+                    } else {
+
+                        button
+                            .prop('disabled', false)
+                            .html(originalHtml);
+
+                        showApprovalMessage(
+                            response.message
+                            ?? 'Gagal memproses pengajuan.',
+                            'warning'
+                        );
+                    }
+                },
+
+
+                error: function (xhr) {
+
+                    button
+                        .prop('disabled', false)
+                        .html(originalHtml);
+
+
+                    let message =
+                        'Terjadi kesalahan saat memproses pengajuan.';
+
+
+                    if (
+                        xhr.responseJSON
+                        &&
+                        xhr.responseJSON.message
+                    ) {
+
+                        message =
+                            xhr.responseJSON.message;
+                    }
+
+
+                    showApprovalMessage(
+                        message,
+                        'danger'
+                    );
+                }
+
+            });
+
+        }
+    );
+
+    // =====================================================
+    // REJECT
+    // =====================================================
+
+    $(document).on(
+        'click',
+        '.btn-reject-permission',
+        function () {
+
+            const button = $(this);
+
+            const url = button.data('url');
+
+
+            if (!confirm('Tolak izin ini?')) {
+                return;
+            }
+
+
+            const originalHtml = button.html();
+
+
+            button
+                .prop('disabled', true)
+                .html(
+                    '<span class="spinner-border spinner-border-sm me-1"></span>' +
+                    'Memproses...'
+                );
+
+
+            $.ajax({
+
+                url: url,
+
+                type: 'POST',
+
+                data: {
+
+                    _token:
+                        '{{ csrf_token() }}'
+
+                },
+
+                headers: {
+
+                    'Accept':
+                        'application/json'
+
+                },
+
+
+                success: function (response) {
+
+                    if (response.success) {
+
+                        table.ajax.reload(null, false);
+
+
+                        showApprovalMessage(
+                            response.message,
+                            'success'
+                        );
+
+                    } else {
+
+                        button
+                            .prop('disabled', false)
+                            .html(originalHtml);
+
+                        showApprovalMessage(
+                            response.message
+                            ?? 'Gagal memproses pengajuan.',
+                            'warning'
+                        );
+                    }
+                },
+
+
+                error: function (xhr) {
+
+                    button
+                        .prop('disabled', false)
+                        .html(originalHtml);
+
+
+                    let message =
+                        'Terjadi kesalahan saat memproses pengajuan.';
+
+
+                    if (
+                        xhr.responseJSON
+                        &&
+                        xhr.responseJSON.message
+                    ) {
+
+                        message =
+                            xhr.responseJSON.message;
+                    }
+
+
+                    showApprovalMessage(
+                        message,
+                        'danger'
+                    );
+                }
+
+            });
+
+        }
+    );
+
+    // =====================================================
+    // NOTIFICATION
+    // =====================================================
+
+    function showApprovalMessage(
+        message,
+        type = 'success'
+    ) {
+
+        const alert = $(`
+            <div
+                class="alert alert-${type} alert-dismissible fade show shadow-sm"
+                role="alert"
+                style="
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 9999;
+                    min-width: 320px;
+                "
+            >
+
+                ${message}
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+                </button>
+
+            </div>
+        `);
+
+
+        $('body').append(alert);
+
+
+        setTimeout(function () {
+
+            alert.alert('close');
+
+        }, 3000);
+    }
+
 
     // =====================================================
     // ENTER
