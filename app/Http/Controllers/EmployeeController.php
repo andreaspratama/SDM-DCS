@@ -175,6 +175,21 @@ class EmployeeController extends Controller
                     </a>
                 ';
 
+                $edit = '
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-warning btn-edit-employee"
+                        data-id="' . $row->id . '"
+                        data-nama="' . e($row->nama) . '"
+                        data-uid="' . e((string) $row->uid) . '"
+                        data-unit="' . $row->unit_id . '"
+                        title="Edit Pegawai"
+                    >
+                        <i class="bi bi-pencil-square"></i>
+                        Edit
+                    </button>
+                ';
+
                 // Pegawai sudah nonaktif
                 if (!$row->is_active) {
 
@@ -222,6 +237,8 @@ class EmployeeController extends Controller
                             <i class="bi bi-person-x"></i>
                             Keluar
                         </button>
+
+                        ' . $edit . '
 
                     </div>
                 ';
@@ -844,5 +861,102 @@ class EmployeeController extends Controller
                 'success',
                 $message
             );
+    }
+
+    public function store(Request $request)
+    {
+        // Rapikan input sebelum validasi
+        $request->merge([
+            'nama' => trim((string) $request->input('nama')),
+            'uid' => trim((string) $request->input('uid')),
+        ]);
+
+        // Validasi data dari modal
+        $validated = $request->validate([
+            'nama' => 'required|string|max:255',
+            'uid' => 'required|string|max:50',
+            'unit_id' => 'required|exists:units,id',
+        ], [
+            'nama.required' => 'Nama pegawai wajib diisi.',
+            'nama.max' => 'Nama pegawai maksimal 255 karakter.',
+            'uid.required' => 'UID wajib diisi.',
+            'uid.max' => 'UID maksimal 50 karakter.',
+            'unit_id.required' => 'Silakan pilih unit pegawai.',
+            'unit_id.exists' => 'Unit yang dipilih tidak valid.',
+        ]);
+
+        // Cek UID duplikat pada unit yang sama
+        $uidSudahAda = Employee::where('uid', $validated['uid'])
+            ->where('unit_id', $validated['unit_id'])
+            ->exists();
+
+        if ($uidSudahAda) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'uid' => 'UID tersebut sudah terdaftar pada unit yang dipilih.',
+                ]);
+        }
+
+        // Simpan pegawai baru
+        $employee = new Employee();
+        $employee->nama = $validated['nama'];
+        $employee->uid = $validated['uid'];
+        $employee->unit_id = $validated['unit_id'];
+        $employee->is_active = true;
+        $employee->save();
+
+        return redirect()
+            ->route('employee.index')
+            ->with('success', 'Pegawai berhasil ditambahkan.');
+    }
+
+    public function update(Request $request, Employee $employee)
+    {
+        // Rapikan input
+        $request->merge([
+            'nama' => trim((string) $request->input('nama')),
+            'uid' => trim((string) $request->input('uid')),
+        ]);
+
+        // Validasi input
+        $validated = $request->validate([
+            'nama' => 'required|string|max:255',
+            'uid' => 'required|string|max:50',
+            'unit_id' => 'required|exists:units,id',
+        ], [
+            'nama.required' => 'Nama pegawai wajib diisi.',
+            'nama.max' => 'Nama pegawai maksimal 255 karakter.',
+            'uid.required' => 'UID wajib diisi.',
+            'uid.max' => 'UID maksimal 50 karakter.',
+            'unit_id.required' => 'Silakan pilih unit pegawai.',
+            'unit_id.exists' => 'Unit yang dipilih tidak valid.',
+        ]);
+
+        // UID boleh tetap digunakan oleh pegawai ini,
+        // tetapi tidak boleh duplikat dengan pegawai lain di unit yang sama.
+        $uidSudahAda = Employee::where('uid', $validated['uid'])
+            ->where('unit_id', $validated['unit_id'])
+            ->where('id', '!=', $employee->id)
+            ->exists();
+
+        if ($uidSudahAda) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'uid' => 'UID tersebut sudah digunakan pegawai lain pada unit yang dipilih.',
+                ])
+                ->with('edit_employee_id', $employee->id);
+        }
+
+        // Update data pegawai
+        $employee->nama = $validated['nama'];
+        $employee->uid = $validated['uid'];
+        $employee->unit_id = $validated['unit_id'];
+        $employee->save();
+
+        return redirect()
+            ->route('employee.index')
+            ->with('success', 'Data pegawai berhasil diperbarui.');
     }
 }

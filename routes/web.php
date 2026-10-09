@@ -51,6 +51,8 @@ Route::prefix('admin')
         // EMPLOYEE
         Route::get('/employee/datatable', [EmployeeController::class, 'datatable'])->name('employee.datatable');
         Route::get('/employee', [EmployeeController::class, 'index'])->name('employee.index');
+        Route::post('/employee', [EmployeeController::class, 'store'])->name('employee.store');
+        Route::put('/employee/{employee}', [EmployeeController::class, 'update'])->name('employee.update');
         Route::get('/employee/upload', [EmployeeController::class, 'formUpload'])->name('employee.upload.form');
         Route::post('/employee/upload', [EmployeeController::class, 'upload'])->name('employee.upload');
         Route::post('/employee/{employee}/deactivate', [EmployeeController::class, 'deactivate'])->name('employee.deactivate');

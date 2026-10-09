@@ -381,7 +381,12 @@
                                 Daftar Pegawai
                             </h3>
 
+                            
                         </div>
+                        <!-- Button trigger modal -->
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">
+                        Tambah Pegawai
+                        </button>
 
                     </div>
 
@@ -785,6 +790,293 @@
 
 </div>
 
+{{-- MODAL TAMBAH PEGAWAI --}}
+<div class="modal fade" id="exampleModal" tabindex="-1"
+     aria-labelledby="exampleModalLabel" aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg"
+             style="border-radius: 16px; overflow: hidden;">
+
+            <form action="{{ route('employee.store') }}" method="POST">
+                @csrf
+
+                {{-- HEADER --}}
+                <div class="modal-header border-0 text-white px-4 py-4"
+                     style="background: linear-gradient(135deg, #0d6efd, #1746a2);">
+
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-25 rounded-3"
+                             style="width: 52px; height: 52px;">
+                            <i class="bi bi-person-plus-fill fs-3"></i>
+                        </div>
+
+                        <div>
+                            <h5 class="modal-title fw-bold mb-1"
+                                id="exampleModalLabel">
+                                Tambah Pegawai
+                            </h5>
+                            <p class="mb-0 small text-white-50">
+                                Daftarkan pegawai baru ke sistem absensi
+                            </p>
+                        </div>
+                    </div>
+
+                    <button type="button"
+                            class="btn-close btn-close-white align-self-start"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                {{-- BODY --}}
+                <div class="modal-body p-4">
+
+                    <div class="alert alert-primary border-0 rounded-3 small mb-4"
+                         role="alert">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        Lengkapi data berikut sesuai identitas pegawai dan UID mesin absensi.
+                    </div>
+
+                    {{-- NAMA --}}
+                    <div class="mb-4">
+                        <label for="nama" class="form-label fw-semibold">
+                            Nama Pegawai <span class="text-danger">*</span>
+                        </label>
+
+                        @error('nama')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
+
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-person text-primary"></i>
+                            </span>
+
+                            <input type="text"
+                                   name="nama"
+                                   id="nama"
+                                   class="form-control border-start-0 ps-1"
+                                   value="{{ old('nama') }}"
+                                   placeholder="Contoh: Budi Santoso"
+                                   maxlength="255"
+                                   autocomplete="name"
+                                   required>
+                        </div>
+
+                        <small class="text-muted">
+                            Masukkan nama lengkap pegawai.
+                        </small>
+                    </div>
+
+                    {{-- UID --}}
+                    <div class="mb-4">
+                        <label for="uid" class="form-label fw-semibold">
+                            UID Mesin Absensi <span class="text-danger">*</span>
+                        </label>
+                        @error('uid')
+                            <div class="text-danger small mt-1">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                {{ $message }}
+                            </div>
+                        @enderror
+
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-fingerprint text-primary"></i>
+                            </span>
+
+                            <input type="text"
+                                   name="uid"
+                                   id="uid"
+                                   class="form-control border-start-0 ps-1"
+                                   value="{{ old('uid') }}"
+                                   placeholder="Contoh: 01 atau 73"
+                                   maxlength="50"
+                                   autocomplete="off"
+                                   required>
+                        </div>
+
+                        <small class="text-muted">
+                            Pastikan UID sesuai dengan mesin. UID <strong>01</strong>
+                            berbeda dengan UID <strong>1</strong>.
+                        </small>
+                    </div>
+
+                    {{-- UNIT --}}
+                    <div class="mb-2">
+                        <label for="unit_id" class="form-label fw-semibold">
+                            Unit Penempatan <span class="text-danger">*</span>
+                        </label>
+                        @error('unit_id')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
+
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-building text-primary"></i>
+                            </span>
+
+                            <select name="unit_id"
+                                    id="unit_id"
+                                    class="form-select border-start-0 ps-1"
+                                    required>
+
+                                <option value="">Pilih unit penempatan</option>
+
+                                @foreach ($units as $unit)
+                                    <option value="{{ $unit->id }}"
+                                        {{ old('unit_id') == $unit->id ? 'selected' : '' }}>
+                                        {{ $unit->nama }}
+                                    </option>
+                                @endforeach
+
+                            </select>
+                        </div>
+
+                        <small class="text-muted">
+                            Pilih unit tempat pegawai bertugas.
+                        </small>
+                    </div>
+
+                </div>
+
+                {{-- FOOTER --}}
+                <div class="modal-footer border-top bg-light px-4 py-3">
+                    <button type="button"
+                            class="btn btn-outline-secondary px-4"
+                            data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>
+                        Batal
+                    </button>
+
+                    <button type="submit"
+                            class="btn btn-primary px-4 shadow-sm">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Simpan Pegawai
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- MODAL EDIT PEGAWAI --}}
+<div class="modal fade" id="editEmployeeModal" tabindex="-1"
+     aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg"
+             style="border-radius: 16px; overflow: hidden;">
+
+            <form id="editEmployeeForm" method="POST">
+                @csrf
+                @method('PUT')
+
+                <div class="modal-header border-0 text-white px-4 py-4"
+                     style="background: linear-gradient(135deg, #0d6efd, #1746a2);">
+
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center justify-content-center
+                                    bg-white bg-opacity-25 rounded-3"
+                             style="width: 50px; height: 50px;">
+                            <i class="bi bi-person-gear fs-3"></i>
+                        </div>
+
+                        <div>
+                            <h5 class="modal-title fw-bold mb-1"
+                                id="editEmployeeModalLabel">
+                                Edit Pegawai
+                            </h5>
+                            <p class="mb-0 small text-white-50">
+                                Perbarui informasi pegawai
+                            </p>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+
+                    <div class="mb-4">
+                        <label for="edit_nama" class="form-label fw-semibold">
+                            Nama Pegawai <span class="text-danger">*</span>
+                        </label>
+
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-person text-primary"></i>
+                            </span>
+                            <input type="text" name="nama" id="edit_nama"
+                                   class="form-control border-start-0 ps-1"
+                                   maxlength="255" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="edit_uid" class="form-label fw-semibold">
+                            UID Mesin Absensi <span class="text-danger">*</span>
+                        </label>
+
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-fingerprint text-primary"></i>
+                            </span>
+                            <input type="text" name="uid" id="edit_uid"
+                                   class="form-control border-start-0 ps-1"
+                                   maxlength="50" required>
+                        </div>
+
+                        <small class="text-muted">
+                            UID 01 berbeda dengan UID 1.
+                        </small>
+                    </div>
+
+                    <div class="mb-2">
+                        <label for="edit_unit_id" class="form-label fw-semibold">
+                            Unit Penempatan <span class="text-danger">*</span>
+                        </label>
+
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-building text-primary"></i>
+                            </span>
+
+                            <select name="unit_id" id="edit_unit_id"
+                                    class="form-select border-start-0 ps-1"
+                                    required>
+                                <option value="">Pilih unit penempatan</option>
+
+                                @foreach ($units as $unit)
+                                    <option value="{{ $unit->id }}">
+                                        {{ $unit->nama }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer border-top bg-light px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary px-4"
+                            data-bs-dismiss="modal">
+                        Batal
+                    </button>
+
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Simpan Perubahan
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 
@@ -1165,6 +1457,47 @@ $(document).ready(function () {
 
 });
 
+</script>
+
+<script>
+document.addEventListener('click', function (event) {
+    const button = event.target.closest('.btn-edit-employee');
+
+    if (!button) {
+        return;
+    }
+
+    const form = document.getElementById('editEmployeeForm');
+
+    const employeeId = button.dataset.id;
+
+    // URL update pegawai
+    const urlTemplate = @json(
+        route('employee.update', ['employee' => '__EMPLOYEE_ID__'])
+    );
+
+    form.action = urlTemplate.replace(
+        '__EMPLOYEE_ID__',
+        employeeId
+    );
+
+    // Isi data pegawai
+    document.getElementById('edit_nama').value =
+        button.dataset.nama || '';
+
+    document.getElementById('edit_uid').value =
+        button.dataset.uid || '';
+
+    document.getElementById('edit_unit_id').value =
+        button.dataset.unit || '';
+
+    // Buka modal
+    bootstrap.Modal
+        .getOrCreateInstance(
+            document.getElementById('editEmployeeModal')
+        )
+        .show();
+});
 </script>
 
 @endpush
