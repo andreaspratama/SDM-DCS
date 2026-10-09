@@ -311,50 +311,32 @@ class AttendancePermissionApprovalController extends Controller
                 'approvedBy:id,name',
             ]);
 
+        
         // =====================================================
         // FILTER TANGGAL IZIN
         //
-        // Menampilkan pengajuan yang tanggal izinnya
-        // bersinggungan dengan rentang filter.
+        // Pengajuan ditampilkan jika rentang tanggal izinnya
+        // beririsan dengan rentang filter yang dipilih.
         // =====================================================
 
         if (
             $request->filled('date_from')
             || $request->filled('date_to')
         ) {
-            $dateFrom = $request->date_from ?: '0001-01-01';
-            $dateTo   = $request->date_to ?: '9999-12-31';
+            $dateFrom = $request->filled('date_from')
+                ? $request->date_from
+                : '1000-01-01';
 
-            $query->whereDate(
-                'date_start',
-                '<=',
-                $dateTo
-            )->where(function ($q) use ($dateFrom) {
-                $q->whereDate(
-                    'date_end',
-                    '>=',
-                    $dateFrom
-                )->orWhere(function ($q2) use ($dateFrom) {
-                    $q2->whereNull('date_end')
-                    ->whereDate(
-                        'date_start',
-                        '>=',
-                        $dateFrom
-                    );
-                });
-            });
-        }
+            $dateTo = $request->filled('date_to')
+                ? $request->date_to
+                : '9999-12-31';
 
-
-        if ($request->filled('date_to')) {
-
-            $dateTo = $request->date_to;
-
-            $query->whereDate(
-                'date_start',
-                '<=',
-                $dateTo
-            );
+            $query
+                ->whereDate('date_start', '<=', $dateTo)
+                ->whereRaw(
+                    'COALESCE(date_end, date_start) >= ?',
+                    [$dateFrom]
+                );
         }
 
 
