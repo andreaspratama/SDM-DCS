@@ -23,7 +23,7 @@ use App\Http\Controllers\EmployeeWorkScheduleController;
 
 // LOGIN
 Route::get('/', function () {
-    return view('pages.maintenance');
+    return view('pages.auth.login');
 })->name('login');
 Route::post('/login', [AuthController::class, 'login'])
     ->name('login.process');

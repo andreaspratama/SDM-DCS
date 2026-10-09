@@ -311,31 +311,36 @@ class AttendancePermissionApprovalController extends Controller
                 'approvedBy:id,name',
             ]);
 
-
         // =====================================================
-        // FILTER TANGGAL
+        // FILTER TANGGAL IZIN
+        //
+        // Menampilkan pengajuan yang tanggal izinnya
+        // bersinggungan dengan rentang filter.
         // =====================================================
 
-        if ($request->filled('date_from')) {
+        if (
+            $request->filled('date_from')
+            || $request->filled('date_to')
+        ) {
+            $dateFrom = $request->date_from ?: '0001-01-01';
+            $dateTo   = $request->date_to ?: '9999-12-31';
 
-            $dateFrom = $request->date_from;
-
-            $query->where(function ($q) use ($dateFrom) {
-
+            $query->whereDate(
+                'date_start',
+                '<=',
+                $dateTo
+            )->where(function ($q) use ($dateFrom) {
                 $q->whereDate(
                     'date_end',
                     '>=',
                     $dateFrom
-                )
-
-                ->orWhere(function ($q2) use ($dateFrom) {
-
+                )->orWhere(function ($q2) use ($dateFrom) {
                     $q2->whereNull('date_end')
-                        ->whereDate(
-                            'date_start',
-                            '>=',
-                            $dateFrom
-                        );
+                    ->whereDate(
+                        'date_start',
+                        '>=',
+                        $dateFrom
+                    );
                 });
             });
         }
