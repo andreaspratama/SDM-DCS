@@ -3713,6 +3713,23 @@ class AbsensiController extends Controller
                     ],
                     true
                 );
+            
+            // =========================================================
+            // KHUSUS SMA / SHS
+            // Abaikan scan dengan waktu yang benar-benar sama.
+            // Scan mentah di AttendanceLog tidak dihapus.
+            // =========================================================
+
+            if ($isSmaActivity) {
+                $items = $items
+                    ->unique(function ($item) {
+                        return $item->parsed_time->format('Y-m-d H:i:s');
+                    })
+                    ->values();
+            }
+
+            // Hitung jumlah scan setelah duplikasi disaring.
+            $totalScans = $items->count();
 
             // dd([
             //     'employee' => $employee->nama,

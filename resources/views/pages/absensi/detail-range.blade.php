@@ -512,249 +512,36 @@
 
     // =====================================================
     // KHUSUS SMA / SHS
+    // KELUAR TANPA ABSEN KEMBALI
+    //
+    // Contoh:
+    // 06:51 IN
+    // 16:11 OUT
+    // 16:16 OUT
+    //
+    // Hasil:
+    // 16:11 - 16:16 = 5 menit
+    // =====================================================
+    // =====================================================
+    // DETEKSI UNIT SMA / SHS
+    // Harus didefinisikan sebelum digunakan.
     // =====================================================
 
     $isSmaShs =
         $employee->unit
         &&
         in_array(
-            strtoupper(trim((string) ($employee->unit->code ?? ''))),
+            strtoupper(
+                trim(
+                    (string) ($employee->unit->code ?? '')
+                )
+            ),
             [
                 'SHS',
                 'SMA',
             ],
             true
         );
-
-
-    // =====================================================
-    // AKTIVITAS KELUAR → MASUK
-    //
-    // HANYA HARI KERJA REGULER.
-    //
-    // Ini fix utama error:
-    //
-    // Trying to access array offset on null
-    //
-    // karena Kegiatan Resmi / Lembur tidak punya jadwal.
-    // =====================================================
-    if (
-        $isHariReguler
-        &&
-        $att
-        &&
-        $att->activities
-        &&
-        $jamMasukStandar
-        &&
-        $jamPulangStandar
-    ) {
-
-        $activities =
-            $att->activities
-                ->sortBy('time')
-                ->values();
-
-
-        // =============================================
-        // JAM STANDAR HARI INI
-        // =============================================
-        $standarMasuk =
-            \Carbon\Carbon::parse(
-                $row['tanggal']
-                . ' '
-                . $jamMasukStandar
-            );
-
-        $standarPulang =
-            \Carbon\Carbon::parse(
-                $row['tanggal']
-                . ' '
-                . $jamPulangStandar
-            );
-
-
-        // =============================================
-        // LOOP ACTIVITIES
-        // =============================================
-        for (
-            $i = 0;
-            $i < $activities->count() - 1;
-            $i++
-        ) {
-
-            $current =
-                $activities[$i];
-
-            $next =
-                $activities[$i + 1];
-
-
-            // =========================================
-            // HANYA OUT → IN
-            // =========================================
-            if (
-                $current->type !== 'out'
-                ||
-                $next->type !== 'in'
-            ) {
-                continue;
-            }
-
-
-            // =========================================
-            // JAM KELUAR / KEMBALI
-            // =========================================
-            $jamKeluar =
-                \Carbon\Carbon::parse(
-                    $row['tanggal']
-                    . ' '
-                    . $current->time
-                );
-
-            $jamKembali =
-                \Carbon\Carbon::parse(
-                    $row['tanggal']
-                    . ' '
-                    . $next->time
-                );
-
-
-            // =========================================
-            // HANYA DI DALAM JAM KERJA
-            // =========================================
-            if (
-                $jamKeluar->lt(
-                    $standarMasuk
-                )
-                ||
-                $jamKeluar->gte(
-                    $standarPulang
-                )
-            ) {
-                continue;
-            }
-
-
-            // =========================================
-            // DURASI KELUAR
-            // =========================================
-            $durasiKeluar =
-                (int) $jamKeluar
-                    ->diffInMinutes(
-                        $jamKembali
-                    );
-
-
-            // =========================================
-            // CEK IZIN
-            // =========================================
-            $izinAktivitas = null;
-
-            if (
-                isset($row['izin'])
-                &&
-                $row['izin']
-            ) {
-
-                $izinAktivitas =
-                    $row['izin']->first(
-                        function ($permission) use (
-                            $row,
-                            $jamKeluar,
-                            $jamKembali
-                        ) {
-
-                            if (
-                                !$permission->time_start
-                                ||
-                                !$permission->time_end
-                            ) {
-                                return false;
-                            }
-
-
-                            $izinMulai =
-                                \Carbon\Carbon::parse(
-                                    $row['tanggal']
-                                    . ' '
-                                    . $permission->time_start
-                                );
-
-                            $izinSelesai =
-                                \Carbon\Carbon::parse(
-                                    $row['tanggal']
-                                    . ' '
-                                    . $permission->time_end
-                                );
-
-
-                            return
-                                $izinMulai->lte(
-                                    $jamKeluar
-                                )
-                                &&
-                                $izinSelesai->gte(
-                                    $jamKembali
-                                );
-                        }
-                    );
-            }
-
-
-            // =========================================
-            // TIMELINE
-            // =========================================
-            if ($izinAktivitas) {
-
-                $timeline[] = [
-
-                    'text' =>
-                        '📄 Keluar Dengan Izin: '
-                        . $durasiKeluar
-                        . ' menit ('
-                        . $current->time
-                        . ' - '
-                        . $next->time
-                        . ')',
-
-                    'color' =>
-                        '#0d6efd',
-                ];
-
-            } else {
-
-                $timeline[] = [
-
-                    'text' =>
-                        '🚨 Keluar Tanpa Izin: '
-                        . $durasiKeluar
-                        . ' menit ('
-                        . $current->time
-                        . ' - '
-                        . $next->time
-                        . ')',
-
-                    'color' =>
-                        '#dc2626',
-                ];
-            }
-        }
-    }
-
-    // =====================================================
-    // KHUSUS SMA / SHS
-    // KELUAR TANPA ABSEN KEMBALI
-    //
-    // Contoh:
-    // 06:51 IN
-    // 16:11 OUT
-    // 16:16 OUT / PULANG
-    //
-    // Maka:
-    // 16:11 → Keluar tanpa absen kembali
-    // 16:16 → Pulang
-    // =====================================================
 
     if (
         $isSmaShs
@@ -775,6 +562,13 @@
                 ->sortBy('time')
                 ->values();
 
+        // Standar pulang untuk tanggal yang sedang ditampilkan.
+        $standarPulangSma =
+            \Carbon\Carbon::parse(
+                $row['tanggal']
+                . ' '
+                . $jamPulangStandar
+            );
 
         for (
             $i = 0;
@@ -788,10 +582,7 @@
             $next =
                 $activitiesSma[$i + 1];
 
-
-            // =================================================
-            // HANYA OUT → OUT
-            // =================================================
+            // Hanya pasangan OUT -> OUT.
             if (
                 $current->type !== 'out'
                 ||
@@ -800,10 +591,6 @@
                 continue;
             }
 
-
-            // =================================================
-            // JAM KELUAR
-            // =================================================
             $jamKeluarSma =
                 \Carbon\Carbon::parse(
                     $row['tanggal']
@@ -811,10 +598,6 @@
                     . $current->time
                 );
 
-
-            // =================================================
-            // JAM SCAN BERIKUTNYA
-            // =================================================
             $jamBerikutnyaSma =
                 \Carbon\Carbon::parse(
                     $row['tanggal']
@@ -822,46 +605,34 @@
                     . $next->time
                 );
 
-
-            // =================================================
-            // HANYA JIKA SCAN BERIKUTNYA SUDAH
-            // MENCAPAI JAM PULANG
-            // =================================================
+            // Abaikan jika scan berikutnya masih sebelum
+            // jam pulang standar.
             if (
                 $jamBerikutnyaSma->lt(
-                    $standarPulang
+                    $standarPulangSma
                 )
             ) {
                 continue;
             }
 
-
-            // =================================================
-            // DURASI KELUAR
-            // =================================================
+            // Durasi dari scan OUT pertama ke OUT berikutnya.
             $durasiKeluarSma =
-                (int) $jamKeluarSma
-                    ->diffInMinutes(
-                        $jamBerikutnyaSma
-                    );
+                (int) $jamKeluarSma->diffInMinutes(
+                    $jamBerikutnyaSma
+                );
 
-
-            // =================================================
-            // TIMELINE
-            // =================================================
             $timeline[] = [
 
                 'text' =>
                     '🚨 Keluar tanpa absen kembali: '
                     . $durasiKeluarSma
                     . ' menit ('
-                    . $current->time
+                    . substr((string) $current->time, 0, 5)
                     . ' - '
-                    . $next->time
+                    . substr((string) $next->time, 0, 5)
                     . ')',
 
-                'color' =>
-                    '#dc2626',
+                'color' => '#dc2626',
             ];
         }
     }
