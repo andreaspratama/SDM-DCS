@@ -2491,16 +2491,30 @@ class AbsensiController extends Controller
                     // =================================================
                     $isTkTamaOutOut =
                         $isTkTama
-                        &&
-                        $current->type === 'out'
-                        &&
-                        $next->type === 'out';
+                        && $current->type === 'out'
+                        && $next->type === 'out';
 
+                    // OUT -> OUT khusus SMA/SHS.
+                    // Scan OUT kedua dianggap sebagai checkout akhir
+                    // apabila sudah mencapai/melewati jam pulang.
+                    $isSmaShsOutOut =
+                        !$isTkTama
+                        && in_array(
+                            strtoupper(
+                                trim(
+                                    (string) ($employee->unit->code ?? '')
+                                )
+                            ),
+                            ['SMA', 'SHS'],
+                            true
+                        )
+                        && $current->type === 'out'
+                        && $next->type === 'out';
 
                     if (
                         !$isOutIn
-                        &&
-                        !$isTkTamaOutOut
+                        && !$isTkTamaOutOut
+                        && !$isSmaShsOutOut
                     ) {
                         continue;
                     }
@@ -2527,6 +2541,14 @@ class AbsensiController extends Controller
                             . $next->time
                         );
 
+                    // SMA/SHS: OUT -> OUT hanya dihitung jika
+                    // scan OUT kedua mencapai atau melewati jam pulang.
+                    if (
+                        $isSmaShsOutOut
+                        && $jamKembali->lt($standarPulang)
+                    ) {
+                        continue;
+                    }
 
                     // =================================================
                     // HANYA KELUAR DI DALAM JAM KERJA
