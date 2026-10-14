@@ -2563,52 +2563,45 @@ class AbsensiController extends Controller
                             );
 
 
+
                     // =================================================
-                    // CEK IZIN
+                    // CEK IZIN KELUAR SEMENTARA
+                    // Hanya izin approved dengan jenis dan rentang waktu
+                    // yang sesuai yang membebaskan kejadian keluar.
                     // =================================================
-                    $adaIzin =
-                        $izin->contains(
-                            function ($permission) use (
-                                $tanggal,
-                                $jamKeluar,
-                                $jamKembali
+                    $adaIzin = $izin->contains(
+                        function ($permission) use (
+                            $tanggal,
+                            $jamKeluar,
+                            $jamKembali
+                        ) {
+                            // Hanya izin keluar sementara.
+                            if (
+                                $permission->type !== 'Izin Keluar Sementara'
                             ) {
-
-                                if (
-                                    !$permission->time_start
-                                    ||
-                                    !$permission->time_end
-                                ) {
-                                    return false;
-                                }
-
-
-                                $izinMulai =
-                                    Carbon::parse(
-                                        $tanggal
-                                        . ' '
-                                        . $permission->time_start
-                                    );
-
-
-                                $izinSelesai =
-                                    Carbon::parse(
-                                        $tanggal
-                                        . ' '
-                                        . $permission->time_end
-                                    );
-
-
-                                return
-                                    $izinMulai->lte(
-                                        $jamKeluar
-                                    )
-                                    &&
-                                    $izinSelesai->gte(
-                                        $jamKembali
-                                    );
+                                return false;
                             }
-                        );
+
+                            if (
+                                !$permission->time_start
+                                || !$permission->time_end
+                            ) {
+                                return false;
+                            }
+
+                            $izinMulai = Carbon::parse(
+                                $tanggal . ' ' . $permission->time_start
+                            );
+
+                            $izinSelesai = Carbon::parse(
+                                $tanggal . ' ' . $permission->time_end
+                            );
+
+                            // Izin harus mencakup seluruh rentang keluar.
+                            return $izinMulai->lte($jamKeluar)
+                                && $izinSelesai->gte($jamKembali);
+                        }
+                    );
 
 
                     // =================================================

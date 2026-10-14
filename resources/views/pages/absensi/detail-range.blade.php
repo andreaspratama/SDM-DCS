@@ -510,6 +510,148 @@
         }
     }
 
+        // =====================================================
+        // KELUAR SEMENTARA: OUT -> IN
+        // Berlaku untuk semua unit.
+        // Izin yang membebaskan kejadian hanya
+        // Izin Keluar Sementara yang disetujui.
+        // =====================================================
+        if (
+            $isHariReguler
+            && $att
+            && $att->activities
+            && $jamMasukStandar
+            && $jamPulangStandar
+        ) {
+            $activitiesKeluar =
+                $att->activities
+                    ->sortBy('time')
+                    ->values();
+
+            $standarMasukKeluar =
+                \Carbon\Carbon::parse(
+                    $row['tanggal'] . ' ' . $jamMasukStandar
+                );
+
+            $standarPulangKeluar =
+                \Carbon\Carbon::parse(
+                    $row['tanggal'] . ' ' . $jamPulangStandar
+                );
+
+            for (
+                $i = 0;
+                $i < $activitiesKeluar->count() - 1;
+                $i++
+            ) {
+                $currentKeluar = $activitiesKeluar[$i];
+                $nextKeluar = $activitiesKeluar[$i + 1];
+
+                // Hanya pasangan OUT -> IN.
+                if (
+                    $currentKeluar->type !== 'out'
+                    || $nextKeluar->type !== 'in'
+                ) {
+                    continue;
+                }
+
+                $jamKeluarEvent =
+                    \Carbon\Carbon::parse(
+                        $row['tanggal'] . ' ' . $currentKeluar->time
+                    );
+
+                $jamKembaliEvent =
+                    \Carbon\Carbon::parse(
+                        $row['tanggal'] . ' ' . $nextKeluar->time
+                    );
+
+                // Abaikan scan sebelum jam masuk atau saat/setelah jam pulang.
+                if (
+                    $jamKeluarEvent->lt($standarMasukKeluar)
+                    || $jamKeluarEvent->gte($standarPulangKeluar)
+                    || !$jamKembaliEvent->gt($jamKeluarEvent)
+                ) {
+                    continue;
+                }
+
+                $adaIzinKeluarEvent = false;
+
+                if (
+                    isset($row['izin'])
+                    && $row['izin']
+                ) {
+                    foreach ($row['izin'] as $izinKeluarEvent) {
+                        if (
+                            $izinKeluarEvent->type !== 'Izin Keluar Sementara'
+                            || !$izinKeluarEvent->time_start
+                            || !$izinKeluarEvent->time_end
+                        ) {
+                            continue;
+                        }
+
+                        $izinMulaiEvent =
+                            \Carbon\Carbon::parse(
+                                $row['tanggal'] . ' '
+                                . $izinKeluarEvent->time_start
+                            );
+
+                        $izinSelesaiEvent =
+                            \Carbon\Carbon::parse(
+                                $row['tanggal'] . ' '
+                                . $izinKeluarEvent->time_end
+                            );
+
+                        if (
+                            $izinMulaiEvent->lte($jamKeluarEvent)
+                            && $izinSelesaiEvent->gte($jamKembaliEvent)
+                        ) {
+                            $adaIzinKeluarEvent = true;
+                            break;
+                        }
+                    }
+                }
+
+                $durasiKeluarEvent =
+                    (int) $jamKeluarEvent->diffInMinutes(
+                        $jamKembaliEvent
+                    );
+
+                $waktuKeluarEvent =
+                    $jamKeluarEvent->format('H:i');
+
+                $waktuKembaliEvent =
+                    $jamKembaliEvent->format('H:i');
+
+                if ($adaIzinKeluarEvent) {
+                    $timeline[] = [
+                        'text' =>
+                            'Keluar sementara dengan izin: '
+                            . $waktuKeluarEvent
+                            . ' - '
+                            . $waktuKembaliEvent
+                            . ' ('
+                            . $durasiKeluarEvent
+                            . ' menit)',
+
+                        'color' => '#16a34a',
+                    ];
+                } else {
+                    $timeline[] = [
+                        'text' =>
+                            'Keluar tanpa izin: '
+                            . $waktuKeluarEvent
+                            . ' - '
+                            . $waktuKembaliEvent
+                            . ' ('
+                            . $durasiKeluarEvent
+                            . ' menit)',
+
+                        'color' => '#dc2626',
+                    ];
+                }
+            }
+        }
+
+
     // =====================================================
     // KHUSUS SMA / SHS
     // KELUAR TANPA ABSEN KEMBALI
