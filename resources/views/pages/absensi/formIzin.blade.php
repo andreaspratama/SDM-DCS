@@ -611,8 +611,8 @@
                     "
                 >
                     Lampiran
-                    <span class="text-gray-400">
-                        (opsional)
+                    <span style="color: red">
+                        <b>(This field is required)</b>
                     </span>
                 </label>
 
@@ -637,6 +637,7 @@
                             text-sm
                             text-gray-600
                         "
+                        required
                     >
 
                     <p class="
