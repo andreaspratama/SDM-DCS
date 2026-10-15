@@ -295,54 +295,6 @@
             <div class="row g-3 mb-4">
 
 
-                {{-- TOTAL PEGAWAI --}}
-                <div class="col-xl-3 col-md-6">
-
-                    <div class="card stat-card">
-
-                        <div class="card-body">
-
-                            <div class="d-flex justify-content-between">
-
-                                <div>
-
-                                    <div class="stat-label">
-                                        Total Pegawai
-                                    </div>
-
-                                    <div class="stat-value">
-                                        {{ number_format($totalPegawai) }}
-                                    </div>
-
-                                    <div class="stat-note">
-                                        {{ $scopeName }}
-                                    </div>
-
-                                </div>
-
-
-                                <div
-                                    class="
-                                        stat-icon
-                                        bg-primary-subtle
-                                        text-primary
-                                    "
-                                >
-
-                                    <i class="bi bi-people-fill"></i>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
                 {{-- PENDING APPROVAL --}}
                 <div class="col-xl-3 col-md-6">
 
