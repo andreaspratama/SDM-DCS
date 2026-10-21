@@ -19,6 +19,7 @@ use App\Services\ApprovalResolverService;
 use App\Services\AttendanceFileImportService;
 use App\Services\WorkCalendarService;
 use App\Services\EmployeeUnitService;
+use App\Services\AnnualLeaveService;
 
 class AbsensiController extends Controller
 {
@@ -4201,6 +4202,7 @@ class AbsensiController extends Controller
     public function formIzinStore(
         Request $request,
         ApprovalResolverService $approvalResolver,
+        AnnualLeaveService $annualLeaveService,
         string $token
     ) {
         // =====================================================
@@ -4238,6 +4240,12 @@ class AbsensiController extends Controller
             'Izin Tidak Masuk',
             'Sakit',
 
+            // Dinas
+            'Pergi Dinas',
+
+            // Cuti
+            'Cuti Tahunan',
+
             // Izin khusus / kepegawaian
             'Pernikahan Pegawai',
             'Pernikahan Anak Pegawai',
@@ -4250,6 +4258,20 @@ class AbsensiController extends Controller
 
         $type = $request->input('type');
 
+        $dinasMode = $request->input('dinas_mode');
+
+        if ($type === 'Pergi Dinas') {
+            $request->validate([
+                'dinas_mode' => [
+                    'required',
+                    \Illuminate\Validation\Rule::in([
+                        'parsial',
+                        'sehari',
+                        'beberapa_hari',
+                    ]),
+                ],
+            ]);
+        }
 
         // =====================================================
         // VALIDASI DASAR
@@ -4301,6 +4323,9 @@ class AbsensiController extends Controller
                 'Izin Pulang Awal',
             ],
             true
+        ) || (
+            $type === 'Pergi Dinas'
+            && $dinasMode === 'parsial'
         );
 
 
@@ -4336,8 +4361,11 @@ class AbsensiController extends Controller
         // -----------------------------------------------------
         if (
             $type === 'Izin Keluar Sementara'
+            || (
+                $type === 'Pergi Dinas'
+                && $dinasMode === 'parsial'
+            )
         ) {
-
             $rules['time_start'] = [
                 'required',
                 'date_format:H:i',
@@ -4348,7 +4376,6 @@ class AbsensiController extends Controller
                 'date_format:H:i',
                 'after:time_start',
             ];
-
         }
 
         // -----------------------------------------------------
@@ -4547,6 +4574,35 @@ class AbsensiController extends Controller
             );
         }
 
+        // =====================================================
+        // VALIDASI CUTI TAHUNAN
+        // =====================================================
+        if ($type === 'Cuti Tahunan') {
+
+            $leaveData = $annualLeaveService->validateRequest(
+                $employee,
+                $validated['date_start'],
+                $validated['date_end']
+            );
+
+            if (
+                $leaveData['balance']
+                < $leaveData['working_days']
+            ) {
+                return back()
+                    ->withErrors([
+                        'date_end' =>
+                            'Sisa cuti tahunan hanya '
+                            . $leaveData['balance']
+                            . ' hari, sedangkan rentang yang dipilih '
+                            . 'membutuhkan '
+                            . $leaveData['working_days']
+                            . ' hari kerja.',
+                    ])
+                    ->withInput();
+            }
+        }
+
 
         // =====================================================
         // NORMALISASI TANGGAL / JAM
@@ -4670,6 +4726,11 @@ class AbsensiController extends Controller
 
             'type' =>
                 $type,
+            
+            'dinas_mode' =>
+                $type === 'Pergi Dinas'
+                    ? $dinasMode
+                    : null,
 
             'description' =>
                 $validated['description']

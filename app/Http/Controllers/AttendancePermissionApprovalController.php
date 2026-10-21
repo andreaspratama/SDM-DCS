@@ -5,6 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\AttendancePermission;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
+use App\Models\EmployeeAnnualLeave;
+use App\Models\AnnualLeaveTransaction;
+use App\Models\LeavePeriod;
+use App\Services\AnnualLeaveService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use App\Models\Employee;
+use Carbon\Carbon;
 
 class AttendancePermissionApprovalController extends Controller
 {
@@ -139,7 +147,16 @@ class AttendancePermissionApprovalController extends Controller
         );
 
         $request->validate([
-            'approval_note' => 'nullable|string|max:1000',
+            'approval_note' => [
+                'required',
+                'string',
+                'min:3',
+                'max:1000',
+            ],
+        ], [
+            'approval_note.required' => 'Alasan penolakan wajib diisi.',
+            'approval_note.min' => 'Alasan penolakan minimal 3 karakter.',
+            'approval_note.max' => 'Alasan penolakan maksimal 1000 karakter.',
         ]);
 
 
@@ -291,7 +308,9 @@ class AttendancePermissionApprovalController extends Controller
                 'time_start',
                 'time_end',
                 'type',
+                'dinas_mode',
                 'description',
+                'approval_note',
                 'attachment',
                 'status',
 
@@ -532,6 +551,76 @@ class AttendancePermissionApprovalController extends Controller
 
                     $type = $permission->type;
 
+                    // -----------------------------------------
+                    // PERGI DINAS
+                    // -----------------------------------------
+                    if ($type === 'Pergi Dinas') {
+
+                        // Dinas sementara dengan jam keluar dan kembali
+                        if ($permission->dinas_mode === 'parsial') {
+
+                            if (
+                                $permission->time_start
+                                && $permission->time_end
+                            ) {
+                                return
+                                    '<div style="color:#0d6efd;font-weight:600;">'
+                                    . '<i class="fa-solid fa-car-side me-1"></i>'
+                                    . 'Dinas Sementara'
+                                    . '</div>'
+                                    . '<div class="small text-muted">'
+                                    . e(substr($permission->time_start, 0, 5))
+                                    . ' - '
+                                    . e(substr($permission->time_end, 0, 5))
+                                    . '</div>';
+                            }
+
+                            return
+                                '<span class="text-muted">'
+                                . 'Jam dinas belum diisi'
+                                . '</span>';
+                        }
+
+                        // Dinas satu hari penuh
+                        if ($permission->dinas_mode === 'sehari') {
+                            return
+                                '<span style="color:#198754;font-weight:600;">'
+                                . '<i class="fa-solid fa-calendar-day me-1"></i>'
+                                . 'Dinas Sehari Penuh'
+                                . '</span>';
+                        }
+
+                        // Dinas beberapa hari
+                        if ($permission->dinas_mode === 'beberapa_hari') {
+                            return
+                                '<span style="color:#198754;font-weight:600;">'
+                                . '<i class="fa-solid fa-calendar-days me-1"></i>'
+                                . 'Dinas Beberapa Hari'
+                                . '</span>';
+                        }
+
+                        // Data lama yang belum memiliki mode dinas
+                        if (
+                            $permission->time_start
+                            && $permission->time_end
+                        ) {
+                            return
+                                '<div style="font-weight:600;">'
+                                . 'Dinas (mode belum diketahui)'
+                                . '</div>'
+                                . '<div class="small text-muted">'
+                                . e(substr($permission->time_start, 0, 5))
+                                . '–'
+                                . e(substr($permission->time_end, 0, 5))
+                                . '</div>';
+                        }
+
+                        return
+                            '<span class="text-muted">'
+                            . 'Mode dinas belum diketahui'
+                            . '</span>';
+                    }
+
 
                     // -----------------------------------------
                     // IZIN KELUAR / KEPERLUAN PRIBADI
@@ -688,6 +777,31 @@ class AttendancePermissionApprovalController extends Controller
                         $permission->description
                         ?? '-'
                     );
+                }
+            )
+
+            // =================================================
+            // ALASAN PENOLAKAN
+            // =================================================
+
+            ->addColumn(
+                'approval_note',
+                function ($permission) {
+
+                    if (
+                        $permission->status
+                            !== AttendancePermission::STATUS_REJECTED
+                        || empty($permission->approval_note)
+                    ) {
+                        return '<span class="text-muted">-</span>';
+                    }
+
+                    return
+                        '<div class="text-danger small" style="white-space:normal; min-width:180px;">'
+                        . '<i class="fa-solid fa-circle-exclamation me-1"></i>'
+                        . '<strong>Alasan penolakan:</strong><br>'
+                        . nl2br(e($permission->approval_note))
+                        . '</div>';
                 }
             )
 
@@ -916,6 +1030,8 @@ class AttendancePermissionApprovalController extends Controller
                 'tanggal',
                 'jam',
                 'type',
+                'description',
+                'approval_note',
                 'status',
                 'attachment',
                 'dibuat',

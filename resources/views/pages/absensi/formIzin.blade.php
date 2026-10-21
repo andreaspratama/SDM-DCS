@@ -300,6 +300,38 @@
                         >
                             Sakit
                         </option>
+                    
+                    {{-- DINAS --}}
+
+                    </optgroup>
+
+                        <optgroup label="Dinas">
+
+                        <option
+                            value="Pergi Dinas"
+                            @selected(
+                                old('type') === 'Pergi Dinas'
+                            )
+                        >
+                            Pergi Dinas
+                        </option>
+
+                    </optgroup>
+                    
+                    {{-- CUTI --}}
+
+                    </optgroup>
+
+                        <optgroup label="Cuti">
+
+                        <option
+                            value="Cuti Tahunan"
+                            @selected(
+                                old('type') === 'Cuti Tahunan'
+                            )
+                        >
+                            Cuti Tahunan
+                        </option>
 
                     </optgroup>
 
@@ -371,6 +403,41 @@
                     </optgroup>
 
                 </select>
+
+                <div id="dinasModeWrapper" class="hidden">
+                    <label class="text-sm font-semibold text-gray-600">
+                        Durasi Dinas
+                    </label>
+
+                    <select
+                        name="dinas_mode"
+                        id="dinas_mode"
+                        class="w-full mt-2 p-3 rounded-xl border border-gray-200"
+                    >
+                        <option value="">Pilih durasi dinas</option>
+
+                        <option
+                            value="parsial"
+                            @selected(old('dinas_mode') === 'parsial')
+                        >
+                            Dinas sementara (jam keluar dan kembali)
+                        </option>
+
+                        <option
+                            value="sehari"
+                            @selected(old('dinas_mode') === 'sehari')
+                        >
+                            Dinas sehari penuh
+                        </option>
+
+                        <option
+                            value="beberapa_hari"
+                            @selected(old('dinas_mode') === 'beberapa_hari')
+                        >
+                            Dinas beberapa hari
+                        </option>
+                    </select>
+                </div>
 
             </div>
 
@@ -705,405 +772,272 @@
      JAVASCRIPT
 ========================================================== --}}
 <script>
-
-document.addEventListener(
-    'DOMContentLoaded',
-    function () {
+    document.addEventListener('DOMContentLoaded', function () {
 
         // =================================================
         // BATAS TANGGAL IZIN
-        // Mulai November 2026:
-        // tidak boleh memilih bulan sebelum bulan berjalan.
-        //
-        // Contoh:
-        // 10 Nov 2026 -> minimal 01 Nov 2026
-        // 10 Des 2026 -> minimal 01 Des 2026
-        //
-        // September & Oktober 2026 tetap bebas.
+        // Mulai November 2026, tanggal minimal adalah
+        // tanggal 1 pada bulan berjalan.
         // =================================================
+        const today = new Date();
+        const batasMulai = new Date(2026, 10, 1);
 
-        const today =
-            new Date();
+        const dateStart = document.getElementById('date_start');
+        const dateEnd = document.getElementById('date_end');
 
-        const batasMulai =
-            new Date(
-                2026,
-                10,
+        if (today >= batasMulai) {
+            const minDate = new Date(
+                today.getFullYear(),
+                today.getMonth(),
                 1
-            ); // 1 November 2026
-
-        const dateStartInput =
-            document.getElementById(
-                'date_start'
             );
 
-        const dateEndInput =
-            document.getElementById(
-                'date_end'
-            );
+            const year = minDate.getFullYear();
+            const month = String(minDate.getMonth() + 1).padStart(2, '0');
+            const minDateString = `${year}-${month}-01`;
 
-
-        if (
-            today >= batasMulai
-        ) {
-
-            const minDate =
-                new Date(
-                    today.getFullYear(),
-                    today.getMonth(),
-                    1
-                );
-
-            const year =
-                minDate.getFullYear();
-
-            const month =
-                String(
-                    minDate.getMonth() + 1
-                ).padStart(
-                    2,
-                    '0'
-                );
-
-            const minDateString =
-                `${year}-${month}-01`;
-
-
-            dateStartInput.setAttribute(
-                'min',
-                minDateString
-            );
-
-            dateEndInput.setAttribute(
-                'min',
-                minDateString
-            );
+            dateStart.setAttribute('min', minDateString);
+            dateEnd.setAttribute('min', minDateString);
         }
 
-        const type =
-            document.getElementById('type');
+        // =================================================
+        // ELEMEN FORM
+        // =================================================
+        const type = document.getElementById('type');
 
-        const dateStart =
-            document.getElementById('date_start');
+        const dateEndWrapper = document.getElementById('dateEndWrapper');
+        const dateStartLabel = document.getElementById('dateStartLabel');
 
-        const dateEnd =
-            document.getElementById('date_end');
+        const timeSection = document.getElementById('timeSection');
+        const timeStartWrapper = document.getElementById('timeStartWrapper');
+        const timeEndWrapper = document.getElementById('timeEndWrapper');
 
-        const dateEndWrapper =
-            document.getElementById(
-                'dateEndWrapper'
-            );
+        const timeStart = document.getElementById('time_start');
+        const timeEnd = document.getElementById('time_end');
 
-        const dateStartLabel =
-            document.getElementById(
-                'dateStartLabel'
-            );
+        const timeStartLabel = document.getElementById('timeStartLabel');
+        const timeEndLabel = document.getElementById('timeEndLabel');
 
-        const timeSection =
-            document.getElementById(
-                'timeSection'
-            );
+        const permissionInfo = document.getElementById('permissionInfo');
 
-        const timeStartWrapper =
-            document.getElementById(
-                'timeStartWrapper'
-            );
+        const dinasModeWrapper = document.getElementById('dinasModeWrapper');
+        const dinasMode = document.getElementById('dinas_mode');
 
-        const timeEndWrapper =
-            document.getElementById(
-                'timeEndWrapper'
-            );
-
-        const timeStart =
-            document.getElementById(
-                'time_start'
-            );
-
-        const timeEnd =
-            document.getElementById(
-                'time_end'
-            );
-
-        const timeStartLabel =
-            document.getElementById(
-                'timeStartLabel'
-            );
-
-        const timeEndLabel =
-            document.getElementById(
-                'timeEndLabel'
-            );
-
-        const permissionInfo =
-            document.getElementById(
-                'permissionInfo'
-            );
-
-
+        // =================================================
+        // UPDATE FORM BERDASARKAN JENIS DAN DURASI IZIN
+        // =================================================
         function updateForm() {
+            const value = type.value;
+            const modeDinas = value === 'Pergi Dinas' ? dinasMode.value : '';
 
-            const value =
-                type.value;
+            const isKeluar = value === 'Izin Keluar Sementara';
+            const isTerlambat = value === 'Izin Terlambat';
+            const isPulangAwal = value === 'Izin Pulang Awal';
+            const isDinas = value === 'Pergi Dinas';
 
+            const isDinasParsial = isDinas && modeDinas === 'parsial';
+            const isDinasSehari = isDinas && modeDinas === 'sehari';
+            const isDinasBeberapaHari =
+                isDinas && modeDinas === 'beberapa_hari';
 
-            const isKeluar =
-                value === 'Izin Keluar Sementara';
-
-
-            const isTerlambat =
-                value === 'Izin Terlambat';
-
-            const isPulangAwal =
-                value === 'Izin Pulang Awal';
-
-
+            // Jenis izin yang berlaku untuk satu tanggal.
             const isPartial =
-                isKeluar
-                ||
-                isTerlambat
-                ||
-                isPulangAwal;
+                isKeluar ||
+                isTerlambat ||
+                isPulangAwal ||
+                isDinasParsial;
 
+            const isSingleDate = isPartial || isDinasSehari;
 
-            // =============================================
-            // DEFAULT
-            // =============================================
-            dateStartLabel.textContent =
-                'Tanggal Mulai';
+            // =================================================
+            // PILIHAN DURASI DINAS
+            // =================================================
+            dinasModeWrapper.classList.toggle('hidden', !isDinas);
+            dinasMode.required = isDinas;
 
-            dateEndWrapper.classList.remove(
-                'hidden'
-            );
-
-            dateEnd.required =
-                true;
-
-            timeSection.classList.add(
-                'hidden'
-            );
-
-            timeStart.required =
-                false;
-
-            timeEnd.required =
-                false;
-
-            timeStartWrapper.classList.remove(
-                'hidden'
-            );
-
-            timeEndWrapper.classList.remove(
-                'hidden'
-            );
-
-            permissionInfo.classList.add(
-                'hidden'
-            );
-
-
-            // =============================================
-            // PARTIAL
-            // =============================================
-            if (isPartial) {
-
-                dateStartLabel.textContent =
-                    'Tanggal';
-
-                dateEndWrapper.classList.add(
-                    'hidden'
-                );
-
-                dateEnd.required =
-                    false;
-
-                dateEnd.value =
-                    dateStart.value;
+            if (!isDinas) {
+                dinasMode.value = '';
             }
 
+            // =================================================
+            // DEFAULT FORM
+            // =================================================
+            dateStartLabel.textContent = 'Tanggal Mulai';
 
-            // =============================================
-            // IZIN KELUAR /
-            // KEPERLUAN PRIBADI
-            // =============================================
+            dateEndWrapper.classList.remove('hidden');
+            dateEnd.required = true;
+
+            timeSection.classList.add('hidden');
+            timeStartWrapper.classList.remove('hidden');
+            timeEndWrapper.classList.remove('hidden');
+
+            timeStart.required = false;
+            timeEnd.required = false;
+
+            timeStart.value = '';
+            timeEnd.value = '';
+
+            permissionInfo.classList.add('hidden');
+            permissionInfo.textContent = '';
+
+            // =================================================
+            // SATU TANGGAL
+            // Izin keluar, terlambat, pulang awal,
+            // dan dinas parsial/sehari.
+            // =================================================
+            if (isSingleDate) {
+                dateStartLabel.textContent = 'Tanggal';
+
+                dateEndWrapper.classList.add('hidden');
+                dateEnd.required = false;
+                dateEnd.value = dateStart.value;
+            }
+
+            // =================================================
+            // IZIN KELUAR SEMENTARA
+            // =================================================
             if (isKeluar) {
+                timeSection.classList.remove('hidden');
 
-                timeSection.classList.remove(
-                    'hidden'
-                );
+                timeStartLabel.textContent = 'Jam Keluar';
+                timeEndLabel.textContent = 'Jam Kembali';
 
-                timeStartLabel.textContent =
-                    'Jam Keluar';
-
-                timeEndLabel.textContent =
-                    'Jam Kembali';
-
-                timeStart.required =
-                    true;
-
-                timeEnd.required =
-                    true;
-
+                timeStart.required = true;
+                timeEnd.required = true;
 
                 permissionInfo.textContent =
-                    'Isi jam keluar dan jam kembali. '
-                    + 'Izin ini berlaku untuk satu tanggal.';
+                    'Isi jam keluar dan jam kembali. Izin ini berlaku untuk satu tanggal.';
 
-                permissionInfo.classList.remove(
-                    'hidden'
-                );
-
+                permissionInfo.classList.remove('hidden');
             }
 
+            // =================================================
+            // PERGI DINAS
+            // =================================================
+            else if (isDinas) {
+                if (isDinasParsial) {
+                    // Dinas sementara: satu tanggal dengan jam.
+                    timeSection.classList.remove('hidden');
 
-            // =============================================
-            // IZIN TERLAMBAT
-            // =============================================
-            else if (isTerlambat) {
+                    timeStartLabel.textContent = 'Jam Keluar';
+                    timeEndLabel.textContent = 'Jam Kembali';
 
-                timeSection.classList.remove(
-                    'hidden'
-                );
-
-                timeStartLabel.textContent =
-                    'Jam Perkiraan Datang';
-
-                timeStart.required =
-                    true;
-
-
-                timeEndWrapper.classList.add(
-                    'hidden'
-                );
-
-                timeEnd.required =
-                    false;
-
-                timeEnd.value =
-                    '';
-
-
-                permissionInfo.textContent =
-                    'Masukkan jam perkiraan datang. '
-                    + 'Izin terlambat berlaku untuk satu tanggal.';
-
-                permissionInfo.classList.remove(
-                    'hidden'
-                );
-
-            }
-
-            // PULANG AWAL
-            else if (isPulangAwal) {
-
-                timeSection.classList.remove(
-                    'hidden'
-                );
-
-                timeStartLabel.textContent =
-                    'Jam Pulang';
-
-                timeStart.required =
-                    true;
-
-
-                // Jam akhir tidak diperlukan
-                timeEndWrapper.classList.add(
-                    'hidden'
-                );
-
-                timeEnd.required =
-                    false;
-
-                timeEnd.value =
-                    '';
-
-
-                permissionInfo.textContent =
-                    'Masukkan jam izin pulang. '
-                    + 'Izin pulang awal berlaku untuk satu tanggal.';
-
-                permissionInfo.classList.remove(
-                    'hidden'
-                );
-            }
-
-
-            // =============================================
-            // FULL DAY
-            // =============================================
-            else {
-
-                timeStart.required =
-                    false;
-
-                timeEnd.required =
-                    false;
-
-                timeStart.value =
-                    '';
-
-                timeEnd.value =
-                    '';
-
-                if (value) {
+                    timeStart.required = true;
+                    timeEnd.required = true;
 
                     permissionInfo.textContent =
-                        'Jenis izin ini menggunakan '
-                        + 'rentang tanggal dan tidak '
-                        + 'memerlukan jam.';
+                        'Dinas sementara berlaku untuk satu tanggal. Isi jam keluar dan jam kembali.';
+                } else if (isDinasSehari) {
+                    // Dinas sehari penuh: satu tanggal tanpa jam.
+                    permissionInfo.textContent =
+                        'Dinas sehari penuh berlaku untuk satu tanggal. Jam keluar dan jam kembali tidak perlu diisi.';
+                } else if (isDinasBeberapaHari) {
+                    // Dinas beberapa hari: rentang tanggal tanpa jam.
+                    dateStartLabel.textContent = 'Tanggal Mulai';
 
-                    permissionInfo.classList.remove(
-                        'hidden'
-                    );
+                    dateEndWrapper.classList.remove('hidden');
+                    dateEnd.required = true;
+
+                    permissionInfo.textContent =
+                        'Dinas beberapa hari menggunakan tanggal mulai dan tanggal selesai. Jam tidak perlu diisi.';
+                } else {
+                    permissionInfo.textContent =
+                        'Pilih durasi dinas terlebih dahulu.';
                 }
+
+                permissionInfo.classList.remove('hidden');
+            }
+
+            // =================================================
+            // IZIN TERLAMBAT
+            // =================================================
+            else if (isTerlambat) {
+                timeSection.classList.remove('hidden');
+
+                timeStartLabel.textContent = 'Jam Perkiraan Datang';
+
+                timeEndWrapper.classList.add('hidden');
+                timeEnd.required = false;
+                timeEnd.value = '';
+
+                timeStart.required = true;
+
+                permissionInfo.textContent =
+                    'Masukkan jam perkiraan datang. Izin terlambat berlaku untuk satu tanggal.';
+
+                permissionInfo.classList.remove('hidden');
+            }
+
+            // =================================================
+            // IZIN PULANG AWAL
+            // =================================================
+            else if (isPulangAwal) {
+                timeSection.classList.remove('hidden');
+
+                timeStartLabel.textContent = 'Jam Pulang';
+
+                timeEndWrapper.classList.add('hidden');
+                timeEnd.required = false;
+                timeEnd.value = '';
+
+                timeStart.required = true;
+
+                permissionInfo.textContent =
+                    'Masukkan jam izin pulang. Izin pulang awal berlaku untuk satu tanggal.';
+
+                permissionInfo.classList.remove('hidden');
+            }
+
+            // =================================================
+            // IZIN LAINNYA / FULL DAY
+            // =================================================
+            else if (value) {
+                permissionInfo.textContent =
+                    'Jenis izin ini menggunakan tanggal dan tidak memerlukan jam.';
+
+                permissionInfo.classList.remove('hidden');
             }
         }
 
+        // =================================================
+        // JENIS IZIN BERUBAH
+        // =================================================
+        type.addEventListener('change', function () {
+            updateForm();
+        });
 
         // =================================================
-        // SAAT TYPE BERUBAH
+        // DURASI DINAS BERUBAH
         // =================================================
-        type.addEventListener(
-            'change',
-            updateForm
-        );
-
+        dinasMode.addEventListener('change', function () {
+            updateForm();
+        });
 
         // =================================================
-        // SYNC TANGGAL PARTIAL
+        // TANGGAL MULAI BERUBAH
+        // Sinkronkan tanggal selesai untuk izin satu tanggal.
         // =================================================
-        dateStart.addEventListener(
-            'change',
-            function () {
+        dateStart.addEventListener('change', function () {
+            const value = type.value;
+            const mode = value === 'Pergi Dinas' ? dinasMode.value : '';
 
-                const value =
-                    type.value;
+            const isSingleDate =
+                value === 'Izin Keluar Sementara' ||
+                value === 'Izin Terlambat' ||
+                value === 'Izin Pulang Awal' ||
+                (value === 'Pergi Dinas' &&
+                    (mode === 'parsial' || mode === 'sehari'));
 
-                const isPartial =
-                    value === 'Izin Keluar Sementara'
-                    ||
-                    value === 'Izin Terlambat'
-                    ||
-                    value === 'Izin Pulang Awal';
-
-
-                if (isPartial) {
-
-                    dateEnd.value =
-                        dateStart.value;
-                }
+            if (isSingleDate) {
+                dateEnd.value = dateStart.value;
             }
-        );
-
+        });
 
         // =================================================
-        // FIRST LOAD
+        // TAMPILAN AWAL
         // =================================================
         updateForm();
-
-    }
-);
-
+    });
 </script>
 
 

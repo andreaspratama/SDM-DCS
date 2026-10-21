@@ -26,6 +26,7 @@ class AttendancePermission extends Model
         'time_end',
 
         'type',
+        'dinas_mode',
         'description',
         'attachment',
 

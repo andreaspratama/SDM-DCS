@@ -158,7 +158,11 @@
                                     </th>
 
                                     <th>
-                                        Keterangan
+                                        Keterangan Pengajuan
+                                    </th>
+
+                                    <th>
+                                        Alasan Penolakan
                                     </th>
 
                                     <th>
@@ -303,7 +307,16 @@ $(document).ready(function () {
                 data: 'description',
                 name: 'description',
                 orderable: true,
-                searchable: true
+                searchable: true,
+                defaultContent: '-'
+            },
+
+            {
+                data: 'approval_note',
+                name: 'approval_note',
+                orderable: false,
+                searchable: false,
+                defaultContent: '-'
             },
 
             {
@@ -560,7 +573,20 @@ $(document).ready(function () {
             const url = button.data('url');
 
 
-            if (!confirm('Tolak izin ini?')) {
+            const approvalNote = window.prompt(
+                'Masukkan alasan penolakan pengajuan izin:'
+            );
+
+            if (approvalNote === null) {
+                // Pemimpin membatalkan penolakan.
+                return;
+            }
+
+            if (approvalNote.trim().length < 3) {
+                showApprovalMessage(
+                    'Alasan penolakan wajib diisi minimal 3 karakter.',
+                    'warning'
+                );
                 return;
             }
 
@@ -583,10 +609,8 @@ $(document).ready(function () {
                 type: 'POST',
 
                 data: {
-
-                    _token:
-                        '{{ csrf_token() }}'
-
+                    _token: '{{ csrf_token() }}',
+                    approval_note: approvalNote.trim()
                 },
 
                 headers: {
