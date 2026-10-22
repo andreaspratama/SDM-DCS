@@ -4763,10 +4763,17 @@ class AbsensiController extends Controller
         // =====================================================
         // SUCCESS
         // =====================================================
-        return back()->with(
-            'success',
-            '✅ Pengajuan izin berhasil dikirim dan menunggu persetujuan pimpinan.'
-        );
+
+        return redirect()->route('formIzinSuccess');
+        // return back()->with(
+        //     'success',
+        //     '✅ Pengajuan izin berhasil dikirim dan menunggu persetujuan pimpinan.'
+        // );
+    }
+
+    public function formIzinSuccess()
+    {
+        return view('pages.absensi.success');
     }
 
     public function generateAttendance()

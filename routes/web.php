@@ -32,6 +32,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // TOKEN FORM
 Route::get('/form-izin/{token}', [PublicFormIzinController::class, 'create'])->name('formIzin');
 Route::post('/formIzinStore/{token}', [AbsensiController::class, 'formIzinStore'])->name('formIzinStore');
+Route::get('/formIzinSuccess', [AbsensiController::class, 'formIzinSuccess'])->name('formIzinSuccess');
 
 Route::prefix('admin')
     ->middleware('auth')
