@@ -277,6 +277,34 @@
 
                         @endif
 
+                        {{-- Pengaturan Cuti --}}
+                        @if($isAdmin)
+
+                            <li class="nav-item">
+
+                                <a
+                                    href="{{ route('annualLeaveAdmin.statistics') }}"
+                                    class="nav-link {{
+                                        request()->routeIs(
+                                            'annualLeaveAdmin.*'
+                                        )
+                                            ? 'active'
+                                            : ''
+                                    }}"
+                                >
+
+                                    <i class="nav-icon bi bi-collection-play-fill"></i>
+
+                                    <p>
+                                        Pengaturan Cuti
+                                    </p>
+
+                                </a>
+
+                            </li>
+
+                        @endif
+
                     </ul>
 
                 </li>

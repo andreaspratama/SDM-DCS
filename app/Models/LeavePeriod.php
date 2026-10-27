@@ -28,4 +28,3 @@ class LeavePeriod extends Model
         return $this->hasMany(EmployeeAnnualLeave::class);
     }
 }
-

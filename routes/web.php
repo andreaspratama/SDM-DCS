@@ -16,6 +16,7 @@ use App\Http\Controllers\WorkCalendarController;
 use App\Http\Controllers\WorkScheduleController;
 use App\Http\Controllers\WorkScheduleAssignmentController;
 use App\Http\Controllers\EmployeeWorkScheduleController;
+use App\Http\Controllers\AnnualLeaveAdminController;
 
 // Route::get('/', function () {
 //     return view('welcome');
@@ -115,5 +116,15 @@ Route::prefix('admin')
         Route::get('/employee-work-schedules/{employeeWorkSchedule}/edit', [EmployeeWorkScheduleController::class, 'edit'])->name('employeeWorkSchedule.edit');
         Route::put('/employee-work-schedules/{employeeWorkSchedule}', [EmployeeWorkScheduleController::class, 'update'])->name('employeeWorkSchedule.update');
         Route::delete('/employee-work-schedules/{employeeWorkSchedule}', [EmployeeWorkScheduleController::class, 'destroy'])->name('employeeWorkSchedule.destroy');
+
+        // PENGATURAN CUTI TAHUNAN
+        Route::get('/annual-leave', [AnnualLeaveAdminController::class, 'index'])->name('annualLeaveAdmin.index');
+        Route::post('/annual-leave', [AnnualLeaveAdminController::class, 'update'])->name('annualLeaveAdmin.update');
+        Route::get('/annual-leave/statistics', [AnnualLeaveAdminController::class, 'statistics'])->name('annualLeaveAdmin.statistics');
+
+        // KELOLA PERIODE TAHUN AJARAN CUTI TAHUNAN
+        Route::get('/annual-leave/periods', [AnnualLeaveAdminController::class, 'periods'])->name('annualLeaveAdmin.periods');
+        Route::post('/annual-leave/periods', [AnnualLeaveAdminController::class, 'storePeriod'])->name('annualLeaveAdmin.periods.store');
+        Route::post('/annual-leave/periods/{period}/activate', [AnnualLeaveAdminController::class, 'activatePeriod'])->name('annualLeaveAdmin.periods.activate');
 
     });

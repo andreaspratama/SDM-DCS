@@ -61,70 +61,149 @@ class AttendancePermissionApprovalController extends Controller
     // =====================================================
     public function approve(
         Request $request,
-        AttendancePermission $permission
+        AttendancePermission $permission,
+        AnnualLeaveService $annualLeaveService
     ) {
         $user = auth()->user();
 
-        $this->authorizePermission(
-            $user,
-            $permission
-        );
+        $this->authorizePermission($user, $permission);
 
-        $request->validate([
+        $validated = $request->validate([
             'approval_note' => 'nullable|string|max:1000',
         ]);
 
+        try {
+            DB::transaction(function () use (
+                $permission,
+                $user,
+                $validated,
+                $annualLeaveService
+            ) {
+                // Kunci pengajuan agar tidak diproses bersamaan.
+                $lockedPermission = AttendancePermission::query()
+                    ->whereKey($permission->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-        // Hanya pending
-        if (!$permission->isPending()) {
+                if (!$lockedPermission->isPending()) {
+                    throw ValidationException::withMessages([
+                        'permission' => 'Pengajuan ini sudah pernah diproses.',
+                    ]);
+                }
 
+                // Cuti Tahunan memerlukan pemeriksaan dan pemotongan saldo.
+                if ($lockedPermission->type === 'Cuti Tahunan') {
+                    $employee = Employee::findOrFail(
+                        $lockedPermission->employee_id
+                    );
+
+                    $period = LeavePeriod::where('is_active', true)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$period) {
+                        throw ValidationException::withMessages([
+                            'permission' => 'Periode Cuti Tahunan aktif belum tersedia.',
+                        ]);
+                    }
+
+                    $entitlement = EmployeeAnnualLeave::where(
+                        'employee_id',
+                        $employee->id
+                    )
+                        ->where('leave_period_id', $period->id)
+                        ->where('is_eligible', true)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$entitlement) {
+                        throw ValidationException::withMessages([
+                            'permission' => 'Pegawai belum ditetapkan sebagai penerima Cuti Tahunan pada periode aktif.',
+                        ]);
+                    }
+
+                    // Perlindungan tambahan jika debit sudah tercatat.
+                    $existingDebit = AnnualLeaveTransaction::where(
+                        'attendance_permission_id',
+                        $lockedPermission->id
+                    )
+                        ->where('type', AnnualLeaveTransaction::TYPE_DEBIT)
+                        ->exists();
+
+                    if (!$existingDebit) {
+                        $days = $annualLeaveService->countWorkingDays(
+                            $employee,
+                            $lockedPermission->date_start,
+                            $lockedPermission->date_end
+                        );
+
+                        if ($days < 1) {
+                            throw ValidationException::withMessages([
+                                'permission' => 'Pengajuan Cuti Tahunan tidak memiliki hari kerja yang dapat dipotong.',
+                            ]);
+                        }
+
+                        $debit = AnnualLeaveTransaction::where(
+                            'employee_annual_leave_id',
+                            $entitlement->id
+                        )
+                            ->where('type', AnnualLeaveTransaction::TYPE_DEBIT)
+                            ->sum('days');
+
+                        $credit = AnnualLeaveTransaction::where(
+                            'employee_annual_leave_id',
+                            $entitlement->id
+                        )
+                            ->where('type', AnnualLeaveTransaction::TYPE_CREDIT)
+                            ->sum('days');
+
+                        $balance = (int) $entitlement->allowance_days
+                            - (int) $debit
+                            + (int) $credit;
+
+                        if ($balance < $days) {
+                            throw ValidationException::withMessages([
+                                'permission' => "Saldo Cuti Tahunan tidak mencukupi. Saldo: {$balance} hari; kebutuhan: {$days} hari.",
+                            ]);
+                        }
+
+                        AnnualLeaveTransaction::create([
+                            'employee_annual_leave_id' => $entitlement->id,
+                            'attendance_permission_id' => $lockedPermission->id,
+                            'type' => AnnualLeaveTransaction::TYPE_DEBIT,
+                            'days' => $days,
+                            'description' => 'Pemotongan saldo dari persetujuan Cuti Tahunan',
+                            'created_by' => $user->id,
+                        ]);
+                    }
+                }
+
+                // Status dan transaksi debit disimpan bersama.
+                $lockedPermission->update([
+                    'status' => AttendancePermission::STATUS_APPROVED,
+                    'approved_by' => $user->id,
+                    'approved_at' => now(),
+                    'approval_note' => $validated['approval_note'] ?? null,
+                ]);
+            });
+        } catch (ValidationException $e) {
             if ($request->expectsJson()) {
-
                 return response()->json([
                     'success' => false,
-                    'message' => 'Pengajuan ini sudah pernah diproses.',
+                    'message' => collect($e->errors())->flatten()->first(),
+                    'errors' => $e->errors(),
                 ], 422);
             }
 
-            return back()->with([
-                'message' => 'Pengajuan ini sudah pernah diproses.',
-                'alert-type' => 'warning',
-            ]);
+            throw $e;
         }
 
-
-        $permission->update([
-
-            'status' =>
-                AttendancePermission::STATUS_APPROVED,
-
-            'approved_by' =>
-                $user->id,
-
-            'approved_at' =>
-                now(),
-
-            'approval_note' =>
-                $request->approval_note,
-        ]);
-
-
-        // =====================================================
-        // AJAX
-        // =====================================================
-
         if ($request->expectsJson()) {
-
             return response()->json([
                 'success' => true,
                 'message' => 'Pengajuan izin berhasil disetujui.',
             ]);
         }
-
-
-        // =====================================================
-        // REQUEST BIASA
-        // =====================================================
 
         return back()->with([
             'message' => 'Pengajuan izin berhasil disetujui.',
